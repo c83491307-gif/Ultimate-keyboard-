@@ -511,7 +511,7 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - [x] Local password generator and basic weak/reused detection
 - [x] CSV parsing/export utility and Compose management UI
 - [x] CI workflow and initial unit tests
-- [ ] Confirmed successful CI build and APK installation on a physical device
+- [x] Successful CI build and debug APK artifact uploaded (device installation remains unverified)
 - [ ] Inline presentations verified in supported browsers and apps
 - [x] Biometric/device-credential gate for vault UI and five-minute Autofill session gate
 - [ ] Security review, per-dataset Autofill authentication, and robust CSV edge-case tests
@@ -523,6 +523,14 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - Added biometric/device-credential authentication before showing the vault screen; successful authentication opens a five-minute local session.
 - Autofill lookup and save requests now require that recent authenticated session, normalize common domain variants, and skip payment-related forms when detected.
 - Added a weak/reused password audit summary and a warning before exporting plaintext CSV.
-- Added Android CI and initial unit tests. **Build status is pending**; the APK must not be considered verified until the workflow finishes successfully and the artifact is tested on a device.
+- Added Android CI and initial unit tests. CI run #37 completed successfully: `assembleDebug` and `testDebugUnitTest` passed, and the `novakeys-debug-apk` artifact was uploaded. Physical-device installation and runtime behavior remain unverified.
 
 - Fixed initial CI compile blockers: the vault activity now extends `FragmentActivity` for AndroidX BiometricPrompt, and unsupported inline-presentation imports were removed until a real renderer is implemented.
+
+
+### Keyboard setup and drawing panel (2026-10-29)
+
+- Added a setup card in the app that detects whether NovaKeys is enabled and selected as the current default keyboard, with shortcuts to Android input-method settings and the system keyboard picker.
+- Added an offline finger-drawing panel to the keyboard toolbar, including Undo, Clear, Cancel, PNG save, and an attempt to insert the saved image into the receiving app.
+- Drawing/image tools remain hidden for sensitive/password input fields. Whether image insertion works depends on the target app accepting rich-content input; the PNG is saved locally either way.
+- Added unit tests for enabled/default keyboard status detection. CI run: https://github.com/c83491307-gif/Ultimate-keyboard-/actions/runs/40846685204 (success; APK artifact uploaded). This confirms compilation and unit tests, not physical-device UX testing.
