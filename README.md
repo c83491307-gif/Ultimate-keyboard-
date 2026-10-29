@@ -443,7 +443,7 @@ The repository now includes an initial Kotlin/Jetpack Compose Android project sc
 - `PasswordEntry`, `PasswordDao`, and `PasswordDatabase`: Room-backed credential records and search by site.
 - `DatabaseKeyManager`: creates a random 256-bit SQLCipher passphrase and wraps it with an AES-256-GCM key generated in Android Keystore.
 - `NovaAutofillService`: scans autofill structure for username/password fields, proposes saved credentials for matching domains, and uses Android's save flow. It deliberately skips structures identified as payment-related.
-- `NovaInputMethodService`: registers the Android 11+ inline-suggestions request hook; inline UI availability still depends on Android and the target app.
+- `NovaInputMethodService`: registers the Android input-method service. Inline suggestion rendering is **not implemented yet**; Autofill uses the Android system fallback UI.
 - `PasswordTools`: cryptographically secure password generation and basic weak/reused-password checks.
 - `PasswordCsv`: CSV import/export support for common Chrome and Bitwarden column names.
 - `MainActivity`: Compose vault UI with search, add/edit/delete, folders, CSV pickers, password generation, and shortcuts to Android's keyboard/autofill settings.
@@ -460,14 +460,15 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - CSV files contain plaintext passwords. Export only to a location you control, and delete the export securely when no longer needed. Imported CSV rows are also plaintext while the file exists.
 - The vault database is encrypted at rest with SQLCipher; its passphrase is wrapped using an AES-256-GCM Android Keystore key. Device compromise, rooted devices, screenshots, process-memory access, and app-level authorization remain separate threat considerations.
 - The vault screen now requires Android biometric or device-credential authentication; a short five-minute session marker also gates Autofill reads/saves. This is an app-level convenience gate, not a hardware-backed per-secret authentication transaction, and it still requires a security review and device testing.
-- Inline suggestions are not yet verified end-to-end: the IME declares an inline request, but a production inline renderer and device/browser compatibility tests remain outstanding.
+- Inline suggestions are not yet implemented: the IME currently exposes a keyboard-service scaffold only. A production inline renderer using Android `InlinePresentation` and device/browser compatibility tests remain outstanding.
 - Domain matching is normalized for common URL/`www.` differences but is not a full public-suffix or subdomain policy engine. Do not rely on this as your only password manager until these gaps are independently tested.
 - The application requests no Internet permission; CSV file access uses Android's Storage Access Framework. Dependencies are resolved during development/CI, not by the installed app.
 
 ### Current status
 - [x] Initial Android project structure and manifest declarations
 - [x] Encrypted Room/SQLCipher database and Keystore-wrapped database key
-- [x] Initial AutofillService and IME inline-request hook
+- [x] Initial AutofillService and IME service declaration
+- [ ] InlineSuggestionsRequest + InlinePresentation rendering and compatibility tests
 - [x] Local password generator and basic weak/reused detection
 - [x] CSV parsing/export utility and Compose management UI
 - [x] CI workflow and initial unit tests
@@ -484,3 +485,5 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - Autofill lookup and save requests now require that recent authenticated session, normalize common domain variants, and skip payment-related forms when detected.
 - Added a weak/reused password audit summary and a warning before exporting plaintext CSV.
 - Added Android CI and initial unit tests. **Build status is pending**; the APK must not be considered verified until the workflow finishes successfully and the artifact is tested on a device.
+
+- Fixed initial CI compile blockers: the vault activity now extends `FragmentActivity` for AndroidX BiometricPrompt, and unsupported inline-presentation imports were removed until a real renderer is implemented.
