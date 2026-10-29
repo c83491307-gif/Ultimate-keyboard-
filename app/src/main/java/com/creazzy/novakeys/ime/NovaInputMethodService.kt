@@ -72,6 +72,8 @@ class NovaInputMethodService : InputMethodService() {
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, screenshotObserver!!
             )
         }
+        // Resume any opt-in sync that was enabled before the keyboard service started.
+        screenshotHandler?.postDelayed(pendingScreenshotScan, 500L)
     }
 
     override fun onDestroy() {
