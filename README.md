@@ -559,3 +559,14 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - Added an offline finger-drawing panel to the keyboard toolbar, including Undo, Clear, Cancel, PNG save, and an attempt to insert the saved image into the receiving app.
 - Drawing/image tools remain hidden for sensitive/password input fields. Whether image insertion works depends on the target app accepting rich-content input; the PNG is saved locally either way.
 - Added unit tests for enabled/default keyboard status detection. CI run: https://github.com/c83491307-gif/Ultimate-keyboard-/actions/runs/40846685204 (success; APK artifact uploaded). This confirms compilation and unit tests, not physical-device UX testing.
+
+
+## 🏭 Production release and signing
+
+- Production package ID: `com.creazzy.novakeys`. The debug build uses `com.creazzy.novakeys.debug` so test installs do not overwrite the production app.
+- The CI workflow builds the debug app, the release variant, unit tests, and Android Lint. A versioned production release is published only for a Git tag named `vX.Y.Z` and only after signing secrets validate.
+- Required GitHub Actions repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Keep one durable release keystore backed up securely; never commit the keystore or passwords to the repository. Losing the signing key can prevent updates to the existing installed app.
+- To publish a release, configure those four secrets in the repository's **Settings → Secrets and variables → Actions**, create and push a version tag such as `v1.0.0`, then verify the production workflow succeeds. The workflow publishes a signed installable APK, a signed AAB for Play Console, and SHA-256 checksums.
+- The automated build is not a substitute for a physical-device release test. Before making this the everyday keyboard, test Arabic/English layout, cursor movement, composing and deleting text, landscape/large-screen layouts, accessibility, clipboard/image insertion, autofill, battery behavior, and Android versions actually supported by the team.
+- Keyboard apps can process everything typed into ordinary fields. NovaKeys should not be considered a fully trusted password-entry keyboard until the privacy/security review and physical-device testing are complete. Android restricts some operations by design; no keyboard can guarantee compatibility with every app.
+- Stable dependency refresh in this release line: Android Gradle Plugin 8.13.2 / Gradle 8.13, Kotlin 2.2.21, Compose BOM 2026.09.00, Core 1.19.1, Activity 1.13.0, Lifecycle 2.11.0, Room 2.8.5, SQLite 2.7.1, and stable Biometric 1.1.0. Avoid adopting alpha dependencies in the production build without a deliberate compatibility review.
