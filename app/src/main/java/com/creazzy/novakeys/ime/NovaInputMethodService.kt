@@ -128,6 +128,10 @@ class NovaInputMethodService : InputMethodService() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val sensitiveField = isSensitiveInput()
+        if (sensitiveField) {
+            drawingMode = false
+            drawingCanvas = null
+        }
         toolbar.addView(label("NovaKeys", 14f, true), LinearLayout.LayoutParams(0, dp(38), 1f))
         toolbar.addView(toolButton(if (language == "en") "EN · عربي" else "عربي · EN") {
             language = if (language == "en") "ar" else "en"; rebuild()
