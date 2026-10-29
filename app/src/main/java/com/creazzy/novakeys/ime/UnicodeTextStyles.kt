@@ -100,7 +100,10 @@ object UnicodeTextStyles {
             'U' to "∩", 'V' to "Λ", 'Y' to "⅄", '.' to "˙", ',' to "'",
             '?' to "¿", '!' to "¡", '(' to ")", ')' to "(", '[' to "]", ']' to "["
         )
-        return text.reversed().map { replacements[it] ?: it.toString() }.joinToString("")
+        return text.codePoints().toArray().reversed().joinToString("") { cp ->
+            if (cp <= Char.MAX_VALUE.code) replacements[cp.toChar()] ?: String(Character.toChars(cp))
+            else String(Character.toChars(cp))
+        }
     }
 
     fun zalgo(text: String): String {
