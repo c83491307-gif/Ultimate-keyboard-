@@ -1,8 +1,12 @@
 package com.creazzy.novakeys
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.creazzy.novakeys.data.PasswordCsv
 import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
 import com.creazzy.novakeys.security.PasswordTools
@@ -23,6 +28,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun VaultScreen() {
     val context = LocalContext.current
     val dao = remember { PasswordDatabase.get(context).passwords() }
@@ -34,23 +40,47 @@ class MainActivity : ComponentActivity() {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var folder by remember { mutableStateOf("General") }
+    var editingId by remember { mutableStateOf(0L) }
+    var createdAt by remember { mutableStateOf(0L) }
     var showForm by remember { mutableStateOf(false) }
-    var showPassword by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val imported = PasswordCsv.import(context.contentResolver, uri)
+                imported.forEach { dao.upsert(it) }
+                status = "Imported ${imported.size} entries"
+            }.onFailure { status = "Import failed: ${it.message ?: "invalid CSV"}" }
+        }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch {
+            runCatching { PasswordCsv.export(context.contentResolver, uri, entries); status = "CSV exported" }
+                .onFailure { status = "Export failed: ${it.message ?: "could not write file"}" }
+        }
+    }
+
     Scaffold(topBar = { TopAppBar(title = { Text("NovaKeys Password Vault") }) },
-        floatingActionButton = { FloatingActionButton(onClick = { showForm = true }) { Text("+") } }) { padding ->
+        floatingActionButton = { FloatingActionButton(onClick = {
+            editingId = 0L; createdAt = 0L; label = ""; website = ""; username = ""; password = ""; folder = "General"; showForm = true
+        }) { Text("+") } }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
             Text("محلي ومشفّر • Local encrypted vault", style = MaterialTheme.typography.bodyMedium)
+            if (status.isNotBlank()) Text(status, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(query, { query = it }, label = { Text("بحث / Search") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_AUTOFILL_SERVICE_SETTINGS)) } },
-                modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
-            Button(onClick = { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
-                modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
-            Button(onClick = { password = PasswordTools.generate(); showForm = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Generate strong password")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import CSV") }
+                OutlinedButton(onClick = { exportLauncher.launch("novakeys-passwords.csv") }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
             }
-            val shown = entries.filter { query.isBlank() || it.label.contains(query, true) || it.website.contains(query, true) || it.username.contains(query, true) }
+            Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_AUTOFILL_SERVICE_SETTINGS)) } },
+                modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
+            Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
+                modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
+            Button(onClick = { password = PasswordTools.generate(); editingId = 0L; showForm = true },
+                modifier = Modifier.fillMaxWidth()) { Text("Generate strong password") }
+            val shown = entries.filter { query.isBlank() || it.label.contains(query, true) || it.website.contains(query, true) || it.username.contains(query, true) || it.folder.contains(query, true) }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(shown, key = { it.id }) { entry ->
                     ElevatedCard(Modifier.fillMaxWidth()) {
@@ -58,12 +88,14 @@ class MainActivity : ComponentActivity() {
                             Text(entry.label, style = MaterialTheme.typography.titleMedium)
                             Text(entry.website)
                             Text(entry.username)
+                            Text("Folder: ${entry.folder}", style = MaterialTheme.typography.bodySmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = {
+                                    editingId = entry.id; createdAt = entry.createdAt
                                     label = entry.label; website = entry.website; username = entry.username
                                     password = entry.password; folder = entry.folder; showForm = true
                                 }) { Text("Edit") }
-                                TextButton(onClick = { scope.launch { dao.delete(entry) } }) { Text("Delete") }
+                                TextButton(onClick = { scope.launch { dao.delete(entry); status = "Deleted" } }) { Text("Delete") }
                             }
                         }
                     }
@@ -73,23 +105,24 @@ class MainActivity : ComponentActivity() {
     }
     if (showForm) AlertDialog(
         onDismissRequest = { showForm = false },
-        title = { Text("Credential") },
+        title = { Text(if (editingId == 0L) "Add credential" else "Edit credential") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(label, { label = it }, label = { Text("Name") })
-                OutlinedTextField(website, { website = it }, label = { Text("Website / domain") })
-                OutlinedTextField(username, { username = it }, label = { Text("Username / email") })
-                OutlinedTextField(password, { password = it }, label = { Text("Password") })
-                OutlinedTextField(folder, { folder = it }, label = { Text("Folder") })
-                TextButton(onClick = { password = PasswordTools.generate(); showPassword = true }) { Text("Generate password") }
-                if (showPassword) Text("Generated. Save it to keep it.")
+                OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Name") })
+                OutlinedTextField(value = website, onValueChange = { website = it }, label = { Text("Website / domain") })
+                OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username / email") })
+                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") })
+                OutlinedTextField(value = folder, onValueChange = { folder = it }, label = { Text("Folder") })
+                TextButton(onClick = { password = PasswordTools.generate() }) { Text("Generate strong password") }
             }
         },
         confirmButton = { TextButton(onClick = {
             scope.launch {
-                dao.upsert(PasswordEntry(label = label.ifBlank { website }, website = website.trim(),
-                    username = username, password = password, folder = folder.ifBlank { "General" }))
-                label = ""; website = ""; username = ""; password = ""; showPassword = false; showForm = false
+                dao.upsert(PasswordEntry(id = editingId, label = label.ifBlank { website }, website = website.trim(),
+                    username = username, password = password, folder = folder.ifBlank { "General" },
+                    createdAt = if (createdAt == 0L) System.currentTimeMillis() else createdAt))
+                status = "Saved locally"; label = ""; website = ""; username = ""; password = ""
+                folder = "General"; editingId = 0L; createdAt = 0L; showForm = false
             }
         }) { Text("Save") } },
         dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
