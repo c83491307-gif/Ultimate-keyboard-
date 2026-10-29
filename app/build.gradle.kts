@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.creazzy.novakeys"
-        minSdk = 23
+        minSdk = 31
         targetSdk = 36
         versionCode = providers.environmentVariable("APP_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("APP_VERSION_NAME").orNull ?: "1.0.0"
