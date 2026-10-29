@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.creazzy.novakeys.cloud.CloudBackupManager
+import com.creazzy.novakeys.data.PasswordBackup
 import com.creazzy.novakeys.data.PasswordCsv
 import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
@@ -133,6 +135,11 @@ private fun KeyboardSetupCard(refreshKey: Int) {
     var showExportWarning by remember { mutableStateOf(false) }
     var exportBitwarden by remember { mutableStateOf(false) }
     var showAudit by remember { mutableStateOf(false) }
+    var backupPassphrase by remember { mutableStateOf("") }
+    var showBackupPassphrase by remember { mutableStateOf(false) }
+    var backupAction by remember { mutableStateOf("export") }
+    var signedInEmail by remember { mutableStateOf(CloudBackupManager.currentUser(context)?.email.orEmpty()) }
+    var cloudConfigured by remember { mutableStateOf(CloudBackupManager.initialize(context)) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -147,6 +154,33 @@ private fun KeyboardSetupCard(refreshKey: Int) {
         if (uri != null) scope.launch {
             runCatching { PasswordCsv.export(context.contentResolver, uri, entries); status = "Chrome-compatible CSV exported" }
                 .onFailure { status = "Export failed: ${it.message ?: "could not write file"}" }
+        }
+    }
+    val backupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
+                context.contentResolver.openOutputStream(uri).use { stream ->
+                    requireNotNull(stream) { "Cannot open destination" }
+                    stream.write(encrypted.toByteArray(Charsets.UTF_8))
+                }
+                status = "Encrypted backup exported"
+            }.onFailure { status = "Backup export failed: ${it.message ?: "unknown error"}" }
+            backupPassphrase = ""
+        }
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val raw = context.contentResolver.openInputStream(uri).use { stream ->
+                    requireNotNull(stream) { "Cannot open backup file" }
+                    stream.readBytes().toString(Charsets.UTF_8)
+                }
+                val restored = PasswordBackup.decode(raw, backupPassphrase.toCharArray())
+                restored.forEach { dao.upsert(it) }
+                status = "Restored ${restored.size} encrypted-backup entries"
+            }.onFailure { status = "Backup import failed: wrong passphrase or invalid file (${it.message ?: "unknown error"})" }
+            backupPassphrase = ""
         }
     }
     val bitwardenExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -168,6 +202,31 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import CSV") }
                 OutlinedButton(onClick = { exportBitwarden = false; showExportWarning = true }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { backupAction = "export"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Export encrypted backup") }
+                OutlinedButton(onClick = { backupAction = "import"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Import phone backup") }
+            }
+            if (signedInEmail.isNotBlank()) {
+                Text("Google account: $signedInEmail", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { backupAction = "cloudSave"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Save to cloud") }
+                    OutlinedButton(onClick = { backupAction = "cloudRestore"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Restore cloud") }
+                }
+                TextButton(onClick = { CloudBackupManager.signOut(context); signedInEmail = ""; status = "Signed out" }) { Text("Sign out") }
+            } else {
+                Button(onClick = {
+                    scope.launch {
+                        runCatching {
+                            val user = CloudBackupManager.signIn(this@MainActivity)
+                            signedInEmail = user.email.orEmpty()
+                            cloudConfigured = true
+                            status = "Signed in as ${user.email.orEmpty()}"
+                        }.onFailure { status = "Google sign-in unavailable: ${it.message ?: "configuration or network error"}" }
+                    }
+                }, modifier = Modifier.fillMaxWidth(), enabled = cloudConfigured) {
+                    Text(if (cloudConfigured) "Continue with Google to enable cloud backup" else "Google cloud backup needs owner setup")
+                }
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
@@ -232,6 +291,55 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             }
         }) { Text("Save") } },
         dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
+    )
+    if (showBackupPassphrase) AlertDialog(
+        onDismissRequest = { showBackupPassphrase = false; backupPassphrase = "" },
+        title = { Text(when (backupAction) {
+            "export" -> "Encrypt backup"
+            "import" -> "Decrypt phone backup"
+            "cloudSave" -> "Encrypt cloud backup"
+            else -> "Decrypt cloud backup"
+        }) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Use a separate backup passphrase with at least 10 characters. NovaKeys never saves or uploads this passphrase.")
+                OutlinedTextField(value = backupPassphrase, onValueChange = { backupPassphrase = it },
+                    label = { Text("Backup passphrase") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (backupPassphrase.length < 10) {
+                    status = "Backup passphrase must contain at least 10 characters."
+                } else {
+                    showBackupPassphrase = false
+                    when (backupAction) {
+                        "export" -> backupExportLauncher.launch("novakeys-encrypted-backup.json")
+                        "import" -> backupImportLauncher.launch(arrayOf("application/json", "text/*"))
+                        "cloudSave" -> scope.launch {
+                            runCatching {
+                                val user = CloudBackupManager.currentUser(context) ?: error("Sign in with Google first.")
+                                val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
+                                CloudBackupManager.uploadEncryptedBackup(user.uid, encrypted)
+                                status = "Encrypted cloud backup saved"
+                            }.onFailure { status = "Cloud save failed: ${it.message ?: "unknown error"}" }
+                            backupPassphrase = ""
+                        }
+                        "cloudRestore" -> scope.launch {
+                            runCatching {
+                                val user = CloudBackupManager.currentUser(context) ?: error("Sign in with Google first.")
+                                val raw = CloudBackupManager.downloadEncryptedBackup(user.uid) ?: error("No cloud backup exists yet.")
+                                val restored = PasswordBackup.decode(raw, backupPassphrase.toCharArray())
+                                restored.forEach { dao.upsert(it) }
+                                status = "Restored ${restored.size} entries from encrypted cloud backup"
+                            }.onFailure { status = "Cloud restore failed: ${it.message ?: "unknown error"}" }
+                            backupPassphrase = ""
+                        }
+                    }
+                }
+            }) { Text("Continue") }
+        },
+        dismissButton = { TextButton(onClick = { showBackupPassphrase = false; backupPassphrase = "" }) { Text("Cancel") } }
     )
     if (showExportWarning) AlertDialog(
         onDismissRequest = { showExportWarning = false },
