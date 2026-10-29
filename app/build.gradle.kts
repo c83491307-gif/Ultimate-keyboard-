@@ -10,7 +10,6 @@ val releaseStorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSW
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 val hasReleaseSigning = listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
-    .all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.creazzy.novakeys"
@@ -49,7 +48,7 @@ android {
         }
     }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
