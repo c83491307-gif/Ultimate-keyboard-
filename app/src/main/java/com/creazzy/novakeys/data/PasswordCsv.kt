@@ -52,14 +52,30 @@ object PasswordCsv {
         }
     }
 
-    fun export(resolver: ContentResolver, uri: Uri, entries: List<PasswordEntry>) {
+    fun export(resolver: ContentResolver, uri: Uri, entries: List<PasswordEntry>) =
+        writeCsv(resolver, uri, entries, listOf("name", "url", "username", "password", "folder")) {
+            listOf(it.label, it.website, it.username, it.password, it.folder)
+        }
+
+    fun exportBitwarden(resolver: ContentResolver, uri: Uri, entries: List<PasswordEntry>) =
+        writeCsv(resolver, uri, entries,
+            listOf("folder", "favorite", "type", "name", "notes", "fields", "login_uri", "login_username", "login_password")) {
+            listOf(it.folder, "false", "login", it.label, "", "", it.website, it.username, it.password)
+        }
+
+    private fun writeCsv(
+        resolver: ContentResolver,
+        uri: Uri,
+        entries: List<PasswordEntry>,
+        headers: List<String>,
+        values: (PasswordEntry) -> List<String>
+    ) {
         resolver.openOutputStream(uri).use { stream ->
             requireNotNull(stream) { "Cannot open destination" }
             OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
-                writer.appendLine("name,url,username,password,folder")
-                entries.forEach { e ->
-                    writer.appendLine(listOf(e.label, e.website, e.username, e.password, e.folder)
-                        .joinToString(",") { quote(it) })
+                writer.appendLine(headers.joinToString(",") { quote(it) })
+                entries.forEach { entry ->
+                    writer.appendLine(values(entry).joinToString(",") { quote(it) })
                 }
             }
         }
