@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import CSV") }
                 OutlinedButton(onClick = { exportLauncher.launch("novakeys-passwords.csv") }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
             }
-            Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_AUTOFILL_SERVICE_SETTINGS)) } },
+            Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
