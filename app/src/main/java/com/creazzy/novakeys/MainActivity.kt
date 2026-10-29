@@ -26,6 +26,9 @@ import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
 import com.creazzy.novakeys.security.PasswordTools
 import kotlinx.coroutines.launch
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.documentfile.provider.DocumentFile
 
 class MainActivity : FragmentActivity() {
     private var resumeTick by mutableIntStateOf(0)
@@ -138,6 +141,51 @@ private fun KeyboardSetupCard(refreshKey: Int) {
     var showBackupPassphrase by remember { mutableStateOf(false) }
     var backupAction by remember { mutableStateOf("export") }
 
+    var storageTreeUri by remember { mutableStateOf(context.getSharedPreferences("local_storage", 0).getString("tree_uri", null)) }
+    var storedFiles by remember { mutableStateOf<List<DocumentFile>>(emptyList()) }
+    var pendingExportUri by remember { mutableStateOf<Uri?>(null) }
+    fun appFolder(): DocumentFile? {
+        val raw = storageTreeUri ?: return null
+        val root = DocumentFile.fromTreeUri(context, Uri.parse(raw)) ?: return null
+        return root.findFile("NovaKeys") ?: root.createDirectory("NovaKeys")
+    }
+    fun refreshStoredFiles() { storedFiles = appFolder()?.listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList() }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            context.getSharedPreferences("local_storage", 0).edit().putString("tree_uri", uri.toString()).apply()
+            storageTreeUri = uri.toString()
+            val folder = appFolder() ?: error("Could not create NovaKeys folder")
+            refreshStoredFiles()
+            status = "NovaKeys folder ready: " + (folder.name ?: "NovaKeys")
+        }.onFailure { status = "Folder setup failed: " + (it.message ?: "unknown error") }
+    }
+    val mediaImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) scope.launch { runCatching {
+            val folder = appFolder() ?: error("Choose a phone folder first.")
+            var count = 0
+            uris.forEach { uri ->
+                val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "imported-file"
+                val safeName = name.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._ -]"), "_").take(100).ifBlank { "imported-file" }
+                val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                val dest = folder.createFile(mime, System.currentTimeMillis().toString() + "_" + safeName) ?: error("Cannot create file for " + safeName)
+                context.contentResolver.openInputStream(uri).use { input ->
+                    requireNotNull(input) { "Cannot read " + safeName }
+                    context.contentResolver.openOutputStream(dest.uri, "w").use { output -> requireNotNull(output) { "Cannot write " + safeName }; input.copyTo(output) }
+                }
+                count++
+            }
+            refreshStoredFiles()
+            status = "Imported " + count + " file(s) into NovaKeys folder"
+        }.onFailure { status = "File import failed: " + (it.message ?: "unknown error") } }
+    }
+    val storedFileExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { target ->
+        val source = pendingExportUri
+        if (target != null && source != null) scope.launch { runCatching {
+            context.contentResolver.openInputStream(source).use { input -> requireNotNull(input) { "Cannot read source file" }; context.contentResolver.openOutputStream(target, "w").use { output -> requireNotNull(output) { "Cannot write destination" }; input.copyTo(output) } }
+            status = "File exported successfully"
+        }.onFailure { status = "File export failed: " + (it.message ?: "unknown error") }; pendingExportUri = null }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             runCatching {
@@ -213,6 +261,34 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             Button(onClick = {
                 context.startActivity(Intent(context, com.creazzy.novakeys.clipboard.TextToImageActivity::class.java))
             }, modifier = Modifier.fillMaxWidth()) { Text("Convert copied text to image") }
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Phone storage · Local files", style = MaterialTheme.typography.titleMedium)
+                    Text(if (storageTreeUri == null) "Choose a location in phone storage. NovaKeys will create its own folder there." else "Folder: NovaKeys · " + storedFiles.size + " file(s)")
+                    Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text(if (storageTreeUri == null) "Choose / create NovaKeys folder" else "Change phone folder") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { mediaImportLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.weight(1f), enabled = storageTreeUri != null) { Text("Import files / media") }
+                        OutlinedButton(onClick = {
+                            runCatching {
+                                val folder = appFolder() ?: error("Choose a phone folder first.")
+                                val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
+                                val dest = folder.createFile("application/json", "novakeys-backup-" + System.currentTimeMillis() + ".json") ?: error("Cannot create backup file")
+                                context.contentResolver.openOutputStream(dest.uri, "w").use { output -> requireNotNull(output) { "Cannot write backup" }; output.write(encrypted.toByteArray(Charsets.UTF_8)) }
+                                refreshStoredFiles()
+                                status = "Encrypted backup written into NovaKeys folder"
+                            }.onFailure { status = "Folder backup failed: " + (it.message ?: "unknown error") }
+                        }, modifier = Modifier.weight(1f), enabled = storageTreeUri != null) { Text("Save encrypted backup") }
+                    }
+                    OutlinedButton(onClick = { refreshStoredFiles() }, modifier = Modifier.fillMaxWidth(), enabled = storageTreeUri != null) { Text("Refresh folder files") }
+                    storedFiles.take(30).forEach { file ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) { Text(file.name ?: "Unnamed file", style = MaterialTheme.typography.bodyMedium); Text(file.length().toString() + " bytes", style = MaterialTheme.typography.bodySmall) }
+                            TextButton(onClick = { pendingExportUri = file.uri; storedFileExportLauncher.launch(file.name ?: "novakeys-file") }) { Text("Export") }
+                        }
+                    }
+                    if (storedFiles.size > 30) Text("Showing first 30 files.")
+                }
+            }
             Button(onClick = { showAudit = !showAudit }, modifier = Modifier.fillMaxWidth()) { Text(if (showAudit) "Hide password audit" else "Audit weak/reused passwords") }
             if (showAudit) {
                 val findings = PasswordTools.weakOrRepeated(entries.map { it.password })
@@ -291,25 +367,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
                     when (backupAction) {
                         "export" -> backupExportLauncher.launch("novakeys-encrypted-backup.json")
                         "import" -> backupImportLauncher.launch(arrayOf("application/json", "text/*"))
-                        "cloudSave" -> scope.launch {
-                            runCatching {
-                                val user = CloudBackupManager.currentUser(context) ?: error("Sign in with Google first.")
-                                val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
-                                CloudBackupManager.uploadEncryptedBackup(user.uid, encrypted)
-                                status = "Encrypted cloud backup saved"
-                            }.onFailure { status = "Cloud save failed: ${it.message ?: "unknown error"}" }
-                            backupPassphrase = ""
-                        }
-                        "cloudRestore" -> scope.launch {
-                            runCatching {
-                                val user = CloudBackupManager.currentUser(context) ?: error("Sign in with Google first.")
-                                val raw = CloudBackupManager.downloadEncryptedBackup(user.uid) ?: error("No cloud backup exists yet.")
-                                val restored = PasswordBackup.decode(raw, backupPassphrase.toCharArray())
-                                restored.forEach { dao.upsert(it) }
-                                status = "Restored ${restored.size} entries from encrypted cloud backup"
-                            }.onFailure { status = "Cloud restore failed: ${it.message ?: "unknown error"}" }
-                            backupPassphrase = ""
-                        }
+
                     }
                 }
             }) { Text("Continue") }
