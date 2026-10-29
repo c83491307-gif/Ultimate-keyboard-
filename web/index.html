@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f4f1eb">
 <meta name="description" content="NovaKeys — أداة كتابة عربية وإنجليزية مع أنماط Unicode قابلة للنسخ، مع تنزيل لوحة مفاتيح Android.">
 <meta name="color-scheme" content="light">
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest.webmanifest">\n<link rel="icon" type="image/svg+xml" href="./icons/novakeys.svg">\n<link rel="apple-touch-icon" href="./icons/novakeys.svg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%231c4d43'/%3E%3Cpath d='M27 70V30h10l26 25V30h10v40H63L37 45v25z' fill='%23f7d48b'/%3E%3C/svg%3E">
 <title>NovaKeys — اكتب بطريقتك</title>
 <style>
@@ -27,7 +27,7 @@
 <div class="eyebrow"><span class="dot"></span> مساحة كتابة ذكية · تعمل في متصفحك</div>
 <h1>اكتب بطريقتك.<br><em>خلّي للكلام شخصية.</em></h1>
 <p>حوّل النص إلى أنماط Unicode مميزة، انسخ النتيجة فورًا، أو جرّب لوحة مفاتيح NovaKeys على Android. بسيطة، سريعة، وبدون إرسال نصوصك إلى خادم.</p>
-<div class="hero-actions"><a class="btn btn-primary" href="#studio">جرّب استوديو الكتابة <span aria-hidden="true">↙</span></a><a class="btn btn-soft" href="https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest">كل ملفات التنزيل</a></div>
+<div class="hero-actions"><a class="btn btn-primary" href="#studio">جرّب استوديو الكتابة <span aria-hidden="true">↙</span></a><button id="installApp" class="btn btn-soft hidden" type="button">تثبيت الموقع على الجهاز ↓</button><a class="btn btn-soft" href="https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest">كل ملفات التنزيل</a></div>
 <div class="fineprint">النص الذي تكتبه هنا تتم معالجته محليًا داخل الصفحة.</div>
 </div>
 <div class="showcase" aria-label="معاينة لأنماط الكتابة">
@@ -95,7 +95,7 @@ function notify(msg){toast.textContent=msg;toast.classList.add('show');clearTime
 async function copyText(text){if(!text){notify('اكتب نصًا أولًا');return}try{await navigator.clipboard.writeText(text);notify('تم النسخ')}catch(e){const area=document.createElement('textarea');area.value=text;area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();const ok=document.execCommand('copy');area.remove();notify(ok?'تم النسخ':'تعذر النسخ — حدّد النص يدويًا')}}
 function setStyle(style){selected=style;$$('[data-style]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.style===style)));render()}
 source.addEventListener('input',render);$('#clear').addEventListener('click',()=>{source.value='';render();source.focus()});$$('[data-style]').forEach(b=>b.addEventListener('click',()=>setStyle(b.dataset.style)));$('#copyAll').addEventListener('click',()=>copyText(transform(source.value,selected)));$('#downloadTxt').addEventListener('click',()=>{if(!source.value){notify('اكتب نصًا أولًا');return}const body=Object.keys(names).map(k=>names[k]+'\n'+transform(source.value,k)).join('\n\n');const url=URL.createObjectURL(new Blob([body],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='novakeys-styles.txt';a.click();URL.revokeObjectURL(url);notify('تم تجهيز ملف TXT')});$('#year').textContent=new Date().getFullYear();
-if('serviceWorker'in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+let installPrompt=null;const installButton=$('#installApp');window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;installButton.classList.remove('hidden')});installButton.addEventListener('click',async()=>{if(!installPrompt){notify('من قائمة المتصفح اختر إضافة إلى الشاشة الرئيسية');return}installPrompt.prompt();const choice=await installPrompt.userChoice;installPrompt=null;installButton.classList.add('hidden');if(choice?.outcome==='accepted')notify('تم بدء تثبيت NovaKeys')});window.addEventListener('appinstalled',()=>{installButton.classList.add('hidden');notify('تم تثبيت NovaKeys')});if('serviceWorker'in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 source.value='Make your words stand out';render();
 })();
 </script>
