@@ -289,7 +289,7 @@
 
 إعداد البناء يدعم استهداف Android 16 / API 36، وتشغيل اختبارات الوحدة وAndroid Lint، وتجهيز Android App Bundle موقّع عند إنشاء وسم إصدار مثل `v1.0.0`. يتطلب ذلك إعداد أسرار التوقيع في GitHub Actions ومراجعة التطبيق على أجهزة حقيقية. نجاح CI لا يعني تلقائيًا قبول التطبيق في المتجر.
 
-قبل النشر، راجع [مسودة سياسة الخصوصية](PRIVACY_POLICY.md) و[قائمة جاهزية المتاجر](docs/STORE_RELEASE_CHECKLIST.md). يجب استبدال بيانات التواصل التجريبية، وإكمال إقرارات Data safety ومحتوى التطبيق ومواد صفحة المتجر قبل الإرسال.
+قبل النشر، راجع [سياسة الخصوصية](PRIVACY.md) و[سياسة الأمان](SECURITY.md) و[قائمة جاهزية المتاجر](docs/STORE_RELEASE_CHECKLIST.md). يجب استبدال بيانات التواصل التجريبية، وإكمال إقرارات Data safety ومحتوى التطبيق ومواد صفحة المتجر قبل الإرسال.
 
 ### المتطلبات المستهدفة
 
@@ -456,7 +456,7 @@ NovaKeys/
 <details>
 <summary><b>هل يوجد APK الآن؟</b></summary>
 
-لم يُنشر APK متحقق منه في هذا المستودع حتى الآن. راجع صفحة Releases بعد إضافة ملفات المشروع وإتمام البناء والاختبارات.
+توجد حزمة Debug آلية للاختبار في [إصدار latest](https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest). إنها ليست إصدار إنتاج موقّعًا. راجع [GitHub Actions](https://github.com/c83491307-gif/Ultimate-keyboard-/actions) لحالة آخر بناء.
 </details>
 
 ---
@@ -503,7 +503,7 @@ git push origin feature/your-feature
 
 ## 🔐 Password Manager + Autofill (implementation in progress)
 
-The repository now includes an initial Kotlin/Jetpack Compose Android project scaffold and source files for the password-vault feature. This is source code, not a verified release: the repository has **not yet been confirmed to build**, and no APK should be treated as tested until CI succeeds.
+The repository now includes an initial Kotlin/Jetpack Compose Android project scaffold and source files for the password-vault feature. The latest recorded CI run builds the debug and unsigned release variants, passes unit tests and Android Lint, and publishes a debug test APK. This verifies compilation and automated checks only; it does not establish physical-device compatibility or production security.
 
 ### Implemented source files
 - `PasswordEntry`, `PasswordDao`, and `PasswordDatabase`: Room-backed credential records and search by site.
@@ -516,7 +516,7 @@ The repository now includes an initial Kotlin/Jetpack Compose Android project sc
 - `.github/workflows/android.yml`: CI workflow to build a debug APK and run unit tests.
 
 ### Build and verify
-The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, and SQLCipher for Android 4.6.1. Open the repository in Android Studio or run `gradle assembleDebug testDebugUnitTest` in an environment with Android SDK 35 installed. The GitHub Actions workflow is intended to provide a repeatable build artifact after a successful run.
+The current CI configuration uses Android SDK 36, JDK 17, Gradle 8.13, Kotlin 2.2.21, Room 2.8.5, and SQLCipher for Android 4.6.1. Open the repository in a compatible Android Studio installation or run `gradle assembleDebug assembleRelease testDebugUnitTest lintDebug` with Android SDK 36 installed. CI artifacts are available from successful workflow runs; see the Actions page for the exact commit and result.
 
 ### Important security and platform limits
 - Autofill requires the user to explicitly enable NovaKeys under Android Settings → Passwords, passkeys & data / Autofill service. IME activation is a separate user-controlled setting.
