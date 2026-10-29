@@ -150,6 +150,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
         return root.findFile("NovaKeys") ?: root.createDirectory("NovaKeys")
     }
     fun refreshStoredFiles() { storedFiles = appFolder()?.listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList() }
+    LaunchedEffect(storageTreeUri) { refreshStoredFiles() }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -268,16 +269,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
                     Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text(if (storageTreeUri == null) "Choose / create NovaKeys folder" else "Change phone folder") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { mediaImportLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.weight(1f), enabled = storageTreeUri != null) { Text("Import files / media") }
-                        OutlinedButton(onClick = {
-                            runCatching {
-                                val folder = appFolder() ?: error("Choose a phone folder first.")
-                                val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
-                                val dest = folder.createFile("application/json", "novakeys-backup-" + System.currentTimeMillis() + ".json") ?: error("Cannot create backup file")
-                                context.contentResolver.openOutputStream(dest.uri, "w").use { output -> requireNotNull(output) { "Cannot write backup" }; output.write(encrypted.toByteArray(Charsets.UTF_8)) }
-                                refreshStoredFiles()
-                                status = "Encrypted backup written into NovaKeys folder"
-                            }.onFailure { status = "Folder backup failed: " + (it.message ?: "unknown error") }
-                        }, modifier = Modifier.weight(1f), enabled = storageTreeUri != null) { Text("Save encrypted backup") }
+                        OutlinedButton(onClick = { backupAction = "folderExport"; showBackupPassphrase = true }, modifier = Modifier.weight(1f), enabled = storageTreeUri != null) { Text("Save encrypted backup") }
                     }
                     OutlinedButton(onClick = { refreshStoredFiles() }, modifier = Modifier.fillMaxWidth(), enabled = storageTreeUri != null) { Text("Refresh folder files") }
                     storedFiles.take(30).forEach { file ->
@@ -367,6 +359,17 @@ private fun KeyboardSetupCard(refreshKey: Int) {
                     when (backupAction) {
                         "export" -> backupExportLauncher.launch("novakeys-encrypted-backup.json")
                         "import" -> backupImportLauncher.launch(arrayOf("application/json", "text/*"))
+"folderExport" -> scope.launch {
+    runCatching {
+        val folder = appFolder() ?: error("Choose a phone folder first.")
+        val encrypted = PasswordBackup.encode(entries, backupPassphrase.toCharArray())
+        val dest = folder.createFile("application/json", "novakeys-backup-" + System.currentTimeMillis() + ".json") ?: error("Cannot create backup file")
+        context.contentResolver.openOutputStream(dest.uri, "w").use { output -> requireNotNull(output) { "Cannot write backup" }; output.write(encrypted.toByteArray(Charsets.UTF_8)) }
+        refreshStoredFiles()
+        status = "Encrypted backup written into NovaKeys folder"
+    }.onFailure { status = "Folder backup failed: " + (it.message ?: "unknown error") }
+    backupPassphrase = ""
+}
 
                     }
                 }
