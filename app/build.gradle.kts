@@ -11,21 +11,12 @@ val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 val hasReleaseSigning = listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
     .all { !it.isNullOrBlank() }
-val firebaseApiKey = providers.environmentVariable("FIREBASE_API_KEY").orNull.orEmpty()
-val firebaseAppId = providers.environmentVariable("FIREBASE_APP_ID").orNull.orEmpty()
-val firebaseProjectId = providers.environmentVariable("FIREBASE_PROJECT_ID").orNull.orEmpty()
-val googleWebClientId = providers.environmentVariable("GOOGLE_WEB_CLIENT_ID").orNull.orEmpty()
-fun buildConfigString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.creazzy.novakeys"
     compileSdk = 36
 
     defaultConfig {
-        buildConfigField("String", "FIREBASE_API_KEY", buildConfigString(firebaseApiKey))
-        buildConfigField("String", "FIREBASE_APP_ID", buildConfigString(firebaseAppId))
-        buildConfigField("String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseProjectId))
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", buildConfigString(googleWebClientId))
         applicationId = "com.creazzy.novakeys"
         minSdk = 26
         targetSdk = 36
@@ -71,13 +62,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
     implementation("androidx.compose.ui:ui")
