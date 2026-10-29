@@ -1,7 +1,6 @@
 package com.creazzy.novakeys.autofill
 
 import android.app.assist.AssistStructure
-import android.content.Intent
 import android.os.CancellationSignal
 import android.service.autofill.*
 import android.view.autofill.AutofillId
@@ -9,6 +8,7 @@ import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 class NovaAutofillService : AutofillService() {
@@ -17,12 +17,13 @@ class NovaAutofillService : AutofillService() {
         val structure = request.fillContexts.lastOrNull()?.structure
         val parsed = structure?.let(::parseStructure)
         if (parsed == null || parsed.payment || parsed.domain.isBlank() ||
-            (parsed.usernameId == null && parsed.passwordId == null)) {
+            parsed.domain == "unknown" || (parsed.usernameId == null && parsed.passwordId == null)) {
             callback.onSuccess(null); return
         }
         try {
             val entries = runBlocking {
-                PasswordDatabase.get(applicationContext).passwords().forWebsite(parsed.domain)
+                PasswordDatabase.get(applicationContext).passwords().observeAll().first()
+                    .filter { normalizeDomain(it.website) == normalizeDomain(parsed.domain) }
             }
             if (entries.isEmpty()) { callback.onSuccess(null); return }
             val response = FillResponse.Builder()
@@ -38,7 +39,9 @@ class NovaAutofillService : AutofillService() {
             }
             val saveIds = listOfNotNull(parsed.usernameId, parsed.passwordId).toTypedArray()
             if (saveIds.isNotEmpty()) {
-                response.setSaveInfo(SaveInfo.Builder(SaveInfo.SAVE_DATA_TYPE_USERNAME or SaveInfo.SAVE_DATA_TYPE_PASSWORD, saveIds).build())
+                response.setSaveInfo(SaveInfo.Builder(
+                    SaveInfo.SAVE_DATA_TYPE_USERNAME or SaveInfo.SAVE_DATA_TYPE_PASSWORD, saveIds
+                ).build())
             }
             callback.onSuccess(response.build())
         } catch (_: Throwable) {
@@ -60,12 +63,8 @@ class NovaAutofillService : AutofillService() {
                 val dao = PasswordDatabase.get(applicationContext).passwords()
                 val existing = dao.forWebsite(parsed.domain).firstOrNull { it.username == username }
                 dao.upsert(PasswordEntry(
-                    id = existing?.id ?: 0,
-                    label = parsed.domain,
-                    username = username,
-                    password = password,
-                    website = parsed.domain,
-                    folder = existing?.folder ?: "General",
+                    id = existing?.id ?: 0, label = parsed.domain, username = username, password = password,
+                    website = parsed.domain, folder = existing?.folder ?: "General",
                     createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 ))
@@ -75,12 +74,8 @@ class NovaAutofillService : AutofillService() {
     }
 
     private data class Parsed(
-        val domain: String,
-        val usernameId: AutofillId?,
-        val passwordId: AutofillId?,
-        val usernameValue: String?,
-        val passwordValue: String?,
-        val payment: Boolean
+        val domain: String, val usernameId: AutofillId?, val passwordId: AutofillId?,
+        val usernameValue: String?, val passwordValue: String?, val payment: Boolean
     )
 
     private fun parseStructure(structure: AssistStructure): Parsed {
@@ -93,8 +88,9 @@ class NovaAutofillService : AutofillService() {
         fun visit(node: AssistStructure.ViewNode) {
             val hints = node.autofillHints?.toList().orEmpty()
             val hintText = (hints + listOf(node.hint.orEmpty(), node.idEntry.orEmpty())).joinToString(" ").lowercase()
-            if (listOf("credit", "card", "cc-", "cvc", "cvv", "iban", "payment", "expiration").any { hintText.contains(it) }) payment = true
-            node.webDomain?.takeIf { it.isNotBlank() }?.let { domain = it }
+            if (listOf("credit", "card", "cc-", "cvc", "cvv", "iban", "payment", "expiration", "cardnumber")
+                    .any { hintText.contains(it) }) payment = true
+            node.webDomain?.takeIf { it.isNotBlank() }?.let { domain = normalizeDomain(it) }
             val value = node.autofillValue?.takeIf { it.isText }?.textValue?.toString()
             when {
                 hints.any { it.contains("password", true) } || hintText.contains("password") -> {
@@ -109,6 +105,12 @@ class NovaAutofillService : AutofillService() {
         }
         for (i in 0 until structure.windowNodeCount) visit(structure.getWindowNodeAt(i).rootViewNode)
         return Parsed(domain.ifBlank { "unknown" }, userId, passId, userValue, passValue, payment)
+    }
+
+    private fun normalizeDomain(raw: String): String {
+        val value = raw.trim().lowercase()
+        val parsed = android.net.Uri.parse(if (value.contains("://")) value else "https://$value")
+        return parsed.host?.removePrefix("www.")?.trimEnd('.').orEmpty()
     }
 
     private fun presentation(title: String, subtitle: String): RemoteViews =
