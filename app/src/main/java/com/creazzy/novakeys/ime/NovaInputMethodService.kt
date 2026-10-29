@@ -214,8 +214,9 @@ class NovaInputMethodService : InputMethodService() {
             UnicodeTextStyles.Style.BOLD, UnicodeTextStyles.Style.ITALIC, UnicodeTextStyles.Style.BOLD_ITALIC,
             UnicodeTextStyles.Style.SCRIPT, UnicodeTextStyles.Style.FRAKTUR, UnicodeTextStyles.Style.DOUBLE_STRUCK,
             UnicodeTextStyles.Style.SANS, UnicodeTextStyles.Style.MONOSPACE, UnicodeTextStyles.Style.FULLWIDTH,
-            UnicodeTextStyles.Style.CIRCLED, UnicodeTextStyles.Style.SMALL_CAPS, UnicodeTextStyles.Style.LEET,
-            UnicodeTextStyles.Style.GLITCH
+            UnicodeTextStyles.Style.CIRCLED, UnicodeTextStyles.Style.SMALL_CAPS, UnicodeTextStyles.Style.STRIKETHROUGH,
+            UnicodeTextStyles.Style.UNDERLINE, UnicodeTextStyles.Style.OVERLINE, UnicodeTextStyles.Style.UPSIDE_DOWN,
+            UnicodeTextStyles.Style.LEET, UnicodeTextStyles.Style.GLITCH
         )
         styles.chunked(3).forEach { group ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
