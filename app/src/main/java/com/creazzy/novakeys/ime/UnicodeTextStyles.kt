@@ -6,7 +6,7 @@ object UnicodeTextStyles {
         BOLD("Bold"), ITALIC("Italic"), BOLD_ITALIC("Bold Italic"),
         SCRIPT("Script"), FRAKTUR("Fraktur"), DOUBLE_STRUCK("Double"),
         SANS("Sans"), MONOSPACE("Mono"), FULLWIDTH("Fullwidth"),
-        CIRCLED("Circled"), SMALL_CAPS("Small caps"), LEET("1337"), GLITCH("Glitch")
+        CIRCLED("Circled"), SMALL_CAPS("Small caps"), STRIKETHROUGH("Strike"), UNDERLINE("Underline"), OVERLINE("Overline"), UPSIDE_DOWN("Upside down"), LEET("1337"), GLITCH("Glitch")
     }
 
     private val smallCaps = mapOf(
@@ -21,6 +21,10 @@ object UnicodeTextStyles {
     fun transform(text: String, style: Style): String = when (style) {
         Style.SMALL_CAPS -> text.map { smallCaps[it.lowercaseChar()] ?: it.toString() }.joinToString("")
         Style.LEET -> text.map { leet[it.lowercaseChar()] ?: it.toString() }.joinToString("")
+        Style.STRIKETHROUGH -> combineMark(text, "\u0336")
+        Style.UNDERLINE -> combineMark(text, "\u0332")
+        Style.OVERLINE -> combineMark(text, "\u0305")
+        Style.UPSIDE_DOWN -> upsideDown(text)
         Style.GLITCH -> zalgo(text)
         Style.FULLWIDTH -> text.map { ch ->
             when {
@@ -78,6 +82,25 @@ object UnicodeTextStyles {
             else -> emptyMap()
         }
         return String(Character.toChars(special[cp] ?: mapped))
+    }
+
+    private fun combineMark(text: String, mark: String): String =
+        text.map { if (it.isWhitespace()) it.toString() else it + mark }.joinToString("")
+
+    private fun upsideDown(text: String): String {
+        val replacements = mapOf(
+            'a' to "ɐ", 'b' to "q", 'c' to "ɔ", 'd' to "p", 'e' to "ǝ",
+            'f' to "ɟ", 'g' to "ƃ", 'h' to "ɥ", 'i' to "ᴉ", 'j' to "ɾ",
+            'k' to "ʞ", 'l' to "ן", 'm' to "ɯ", 'n' to "u", 'o' to "o",
+            'p' to "d", 'q' to "b", 'r' to "ɹ", 's' to "s", 't' to "ʇ",
+            'u' to "n", 'v' to "ʌ", 'w' to "ʍ", 'x' to "x", 'y' to "ʎ",
+            'A' to "∀", 'B' to "𐐒", 'C' to "Ɔ", 'E' to "Ǝ", 'F' to "Ⅎ",
+            'G' to "פ", 'H' to "H", 'I' to "I", 'J' to "ſ", 'L' to "˥",
+            'M' to "W", 'N' to "N", 'P' to "Ԁ", 'R' to "ᴚ", 'T' to "⊥",
+            'U' to "∩", 'V' to "Λ", 'Y' to "⅄", '.' to "˙", ',' to "'",
+            '?' to "¿", '!' to "¡", '(' to ")", ')' to "(", '[' to "]", ']' to "["
+        )
+        return text.reversed().map { replacements[it] ?: it.toString() }.joinToString("")
     }
 
     fun zalgo(text: String): String {
