@@ -76,7 +76,7 @@ jobs:
           name: novakeys-debug-downloads
           path: release-assets
       - name: Publish latest debug test build
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           name: NovaKeys — Latest successful test build
@@ -154,7 +154,7 @@ jobs:
           cp "$AAB" "release-production/novakeys-${GITHUB_REF_NAME}.aab"
           (cd release-production && sha256sum *.apk *.aab > SHA256SUMS.txt)
       - name: Publish signed production release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: NovaKeys ${{ github.ref_name }}
