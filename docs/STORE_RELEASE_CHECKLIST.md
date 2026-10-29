@@ -35,7 +35,7 @@ This is an engineering checklist, not a statement that the app has already passe
 ## Google Play (new app / updates)
 
 - [ ] Target API 36 or higher for new apps and updates under the current policy effective 31 August 2026. See [official target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878).
-- [ ] Publish a real HTTPS privacy-policy URL with a monitored contact address. Replace all placeholders in `PRIVACY_POLICY.md`.
+- [ ] Publish a real HTTPS privacy-policy URL with a monitored contact address. Review `PRIVACY.md` against the exact release code and publish it at a stable HTTPS URL before store submission; add a monitored developer contact route.
 - [ ] Complete Data safety accurately from the actual shipped code and SDK inventory; do not copy claims from this checklist without verification.
 - [ ] Complete app access, ads, target audience, content rating, app category, and other Play Console declarations.
 - [ ] Provide app icon, feature graphic, phone/tablet screenshots as required, localized store listing, support contact, and accurate description.
@@ -52,8 +52,17 @@ This is an engineering checklist, not a statement that the app has already passe
 
 ## Known release blockers until resolved
 
-1. A real monitored developer contact must replace the privacy policy placeholders.
+1. A monitored developer contact route must be available before public distribution, and `PRIVACY.md` must match the exact shipped build.
 2. GitHub repository signing secrets must be configured before the version-tag production workflow can publish a signed AAB.
 3. The app needs physical-device acceptance testing and security/privacy review; CI build success is not equivalent to store approval.
-4. The repository README currently documents several planned features. Store metadata must list only verified, implemented features.
+4. The repository README documents both implemented and planned features. Store metadata must list only verified, implemented features; keep roadmap items clearly labeled.
 5. Store account registration, legal ownership, app listing assets, and console declarations must be completed by the developer.
+
+
+## NovaKeys-specific final smoke test
+
+- [ ] Verify Android's keyboard switcher can switch to and away from NovaKeys; the IME subtype metadata declares switching support.
+- [ ] Verify Unicode styling only changes selected text and does not modify unselected text.
+- [ ] Verify sensitive-field behavior for password, visible password, web password, and numeric password variations.
+- [ ] Verify image URI permissions are granted only to the intended receiving app and inaccessible after the grant is revoked.
+- [ ] Confirm the published `latest` asset is clearly marked as a debug test build, never as a signed production release.
