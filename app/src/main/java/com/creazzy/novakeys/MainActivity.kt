@@ -20,7 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.creazzy.novakeys.cloud.CloudBackupManager
 import com.creazzy.novakeys.data.PasswordBackup
 import com.creazzy.novakeys.data.PasswordCsv
 import com.creazzy.novakeys.data.PasswordDatabase
@@ -138,8 +137,6 @@ private fun KeyboardSetupCard(refreshKey: Int) {
     var backupPassphrase by remember { mutableStateOf("") }
     var showBackupPassphrase by remember { mutableStateOf(false) }
     var backupAction by remember { mutableStateOf("export") }
-    var signedInEmail by remember { mutableStateOf(CloudBackupManager.currentUser(context)?.email.orEmpty()) }
-    var cloudConfigured by remember { mutableStateOf(CloudBackupManager.initialize(context)) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -206,27 +203,6 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { backupAction = "export"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Export encrypted backup") }
                 OutlinedButton(onClick = { backupAction = "import"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Import phone backup") }
-            }
-            if (signedInEmail.isNotBlank()) {
-                Text("Google account: $signedInEmail", style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { backupAction = "cloudSave"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Save to cloud") }
-                    OutlinedButton(onClick = { backupAction = "cloudRestore"; showBackupPassphrase = true }, modifier = Modifier.weight(1f)) { Text("Restore cloud") }
-                }
-                TextButton(onClick = { CloudBackupManager.signOut(context); signedInEmail = ""; status = "Signed out" }) { Text("Sign out") }
-            } else {
-                Button(onClick = {
-                    scope.launch {
-                        runCatching {
-                            val user = CloudBackupManager.signIn(this@MainActivity)
-                            signedInEmail = user.email.orEmpty()
-                            cloudConfigured = true
-                            status = "Signed in as ${user.email.orEmpty()}"
-                        }.onFailure { status = "Google sign-in unavailable: ${it.message ?: "configuration or network error"}" }
-                    }
-                }, modifier = Modifier.fillMaxWidth(), enabled = cloudConfigured) {
-                    Text(if (cloudConfigured) "Continue with Google to enable cloud backup" else "Google cloud backup needs owner setup")
-                }
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
@@ -297,8 +273,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
         title = { Text(when (backupAction) {
             "export" -> "Encrypt backup"
             "import" -> "Decrypt phone backup"
-            "cloudSave" -> "Encrypt cloud backup"
-            else -> "Decrypt cloud backup"
+            else -> "Decrypt phone backup"
         }) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
