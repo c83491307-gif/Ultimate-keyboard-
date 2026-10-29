@@ -275,7 +275,7 @@ class NovaInputMethodService : InputMethodService() {
             Toast.makeText(this, "Select text in the app first, then choose a style.", Toast.LENGTH_SHORT).show()
             return
         }
-        connection.commitText(UnicodeTextStyles.transform(selected, style), 1)
+        connection?.commitText(UnicodeTextStyles.transform(selected, style), 1)
     }
 
     private fun decorateSelection(decoration: String) {
@@ -285,7 +285,7 @@ class NovaInputMethodService : InputMethodService() {
             Toast.makeText(this, "Select text in the app first, then choose a decoration.", Toast.LENGTH_SHORT).show()
             return
         }
-        connection.commitText(UnicodeTextStyles.decorate(selected, decoration), 1)
+        connection?.commitText(UnicodeTextStyles.decorate(selected, decoration), 1)
     }
 
     private fun buildDrawingPanel(panel: LinearLayout) {
