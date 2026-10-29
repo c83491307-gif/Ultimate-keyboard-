@@ -13,3 +13,7 @@ Text transformation is performed in the browser; the web tool does not call a te
 
 ## Android download
 The website links to the current GitHub prerelease APK. It is explicitly labelled a debug/test build, not a production-signed release: https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest
+
+
+## Install as a web app
+The page includes a web manifest, SVG app icon, and service worker. On supported Android browsers, use the in-page install action when it appears; otherwise open the browser menu and choose **Install app** or **Add to Home screen**. The app shell is cached after a successful first visit.
