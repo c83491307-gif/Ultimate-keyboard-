@@ -44,6 +44,8 @@ class MainActivity : ComponentActivity() {
     var createdAt by remember { mutableStateOf(0L) }
     var showForm by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
+    var showExportWarning by remember { mutableStateOf(false) }
+    var showAudit by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -72,12 +74,18 @@ class MainActivity : ComponentActivity() {
             OutlinedTextField(query, { query = it }, label = { Text("بحث / Search") }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import CSV") }
-                OutlinedButton(onClick = { exportLauncher.launch("novakeys-passwords.csv") }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
+                OutlinedButton(onClick = { showExportWarning = true }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
+            Button(onClick = { showAudit = !showAudit }, modifier = Modifier.fillMaxWidth()) { Text(if (showAudit) "Hide password audit" else "Audit weak/reused passwords") }
+            if (showAudit) {
+                val findings = PasswordTools.weakOrRepeated(entries.map { it.password })
+                Text("Audit results: ${findings.size} weak or reused password(s)", style = MaterialTheme.typography.titleSmall)
+                findings.values.distinct().forEach { reason -> Text("• $reason", style = MaterialTheme.typography.bodySmall) }
+            }
             Button(onClick = { password = PasswordTools.generate(); editingId = 0L; showForm = true },
                 modifier = Modifier.fillMaxWidth()) { Text("Generate strong password") }
             val shown = entries.filter { query.isBlank() || it.label.contains(query, true) || it.website.contains(query, true) || it.username.contains(query, true) || it.folder.contains(query, true) }
@@ -128,3 +136,14 @@ class MainActivity : ComponentActivity() {
         dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
     )
 }
+
+    if (showExportWarning) AlertDialog(
+        onDismissRequest = { showExportWarning = false },
+        title = { Text("Export plaintext passwords?") },
+        text = { Text("CSV exports contain readable passwords. Save only to a trusted location, do not share the file, and delete it when finished.") },
+        confirmButton = { TextButton(onClick = {
+            showExportWarning = false
+            exportLauncher.launch("novakeys-passwords.csv")
+        }) { Text("Continue export") } },
+        dismissButton = { TextButton(onClick = { showExportWarning = false }) { Text("Cancel") } }
+    )
