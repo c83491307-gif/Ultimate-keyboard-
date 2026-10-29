@@ -9,5 +9,17 @@
   "display": "standalone",
   "background_color": "#f4f1eb",
   "theme_color": "#f4f1eb",
-  "icons": []
+  "icons": [
+    {
+      "src": "./icons/novakeys.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "any",
+  "categories": [
+    "productivity",
+    "utilities"
+  ]
 }
