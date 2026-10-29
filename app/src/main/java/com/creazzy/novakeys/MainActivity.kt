@@ -156,8 +156,9 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             context.getSharedPreferences("local_storage", 0).edit().putString("tree_uri", uri.toString()).apply()
             storageTreeUri = uri.toString()
-            val folder = appFolder() ?: error("Could not create NovaKeys folder")
-            refreshStoredFiles()
+            val root = DocumentFile.fromTreeUri(context, uri) ?: error("Cannot access selected folder")
+            val folder = root.findFile("NovaKeys") ?: root.createDirectory("NovaKeys") ?: error("Could not create NovaKeys folder")
+            storedFiles = folder.listFiles().sortedByDescending { it.lastModified() }
             status = "NovaKeys folder ready: " + (folder.name ?: "NovaKeys")
         }.onFailure { status = "Folder setup failed: " + (it.message ?: "unknown error") }
     }
