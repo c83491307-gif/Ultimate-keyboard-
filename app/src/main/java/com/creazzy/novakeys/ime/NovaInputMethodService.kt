@@ -3,7 +3,6 @@ package com.creazzy.novakeys.ime
 import android.content.ClipData
 import android.content.Context
 import android.content.ClipDescription
-import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
 import android.graphics.Bitmap
