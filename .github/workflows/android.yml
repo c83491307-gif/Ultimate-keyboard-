@@ -33,7 +33,7 @@ jobs:
           test "$SIZE" -gt 5000000
           unzip -t "$APK"
           unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
-          unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?\\.dex
+          unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?[.]dex$'
           unzip -Z1 "$APK" | grep -qx 'resources.arsc'
           echo "Verified single, complete debug APK archive."
       - name: Upload full installable APK
