@@ -4,7 +4,7 @@
 
 ### لوحة مفاتيح ذكية: Clipboard • OCR • Universal Copy • ثيمات قابلة للتخصيص
 
-![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android%2012%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
 ![Privacy](https://img.shields.io/badge/Privacy-Offline%20First-success)
@@ -13,7 +13,7 @@
 
 </div>
 
-> **حالة المشروع بشفافية (2026-10-29):** نجح آخر تشغيل موثق لـ GitHub Actions على الالتزام `cc6083b1` في بناء Debug وRelease غير موقّع، وتشغيل اختبارات الوحدة وLint، والتحقق من سلامة APK، ونشر حزمة اختبار Debug في إصدار `latest`. هذا تحقق آلي للبناء فقط؛ ليس اختبارًا على هاتف فعلي ولا إصدارًا إنتاجيًا موقّعًا. ما زالت بعض الوظائف في الجداول أدناه مخططة أو قيد التحقق، ولا ينبغي اعتبار كل ميزة مذكورة مكتملة. راجع [تنزيلات الاختبار](https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest)، و[سياسة الخصوصية](PRIVACY.md)، و[إرشادات الأمان](SECURITY.md).
+> **حالة المشروع بشفافية (2026-10-29):** نجح تشغيل GitHub Actions رقم 131 على الالتزام `05378686` في بناء Debug وRelease غير موقّع، وتشغيل اختبارات الوحدة وLint، والتحقق من سلامة APK، ونشر حزمة اختبار Debug في إصدار `latest`. الحد الأدنى للتثبيت في هذه النسخة هو Android 12 (API 31) فأحدث. هذا تحقق آلي للبناء فقط؛ ليس اختبارًا على هاتف فعلي ولا إصدارًا إنتاجيًا موقّعًا. ما زالت بعض الوظائف في الجداول أدناه مخططة أو قيد التحقق، ولا ينبغي اعتبار كل ميزة مذكورة مكتملة. راجع [تنزيلات الاختبار](https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest)، و[سياسة الخصوصية](PRIVACY.md)، و[إرشادات الأمان](SECURITY.md).
 
 
 
