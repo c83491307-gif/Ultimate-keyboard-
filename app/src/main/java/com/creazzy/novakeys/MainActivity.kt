@@ -45,17 +45,6 @@ class MainActivity : FragmentActivity() {
             var unlocked by remember { mutableStateOf(false) }
             var authError by remember { mutableStateOf("") }
             val executor = remember { ContextCompat.getMainExecutor(this@MainActivity) }
-            val prompt = remember {
-                BiometricPrompt(this@MainActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        getSharedPreferences("vault_session", MODE_PRIVATE).edit().putLong("unlocked_until", System.currentTimeMillis() + 300000L).apply()
-                        unlocked = true
-                        authError = ""
-                    }
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) { authError = errString.toString() }
-                    override fun onAuthenticationFailed() { authError = "Authentication failed. Try again." }
-                })
-            }
             MaterialTheme {
                 if (unlocked && getSharedPreferences("vault_session", MODE_PRIVATE).getLong("unlocked_until", 0L) > System.currentTimeMillis()) {
                     VaultScreen(refreshKey = currentResumeTick)
@@ -67,10 +56,38 @@ class MainActivity : FragmentActivity() {
                         Spacer(Modifier.height(12.dp))
                         if (authError.isNotBlank()) Text(authError, color = MaterialTheme.colorScheme.error)
                         Button(onClick = {
-                            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                            if (BiometricManager.from(this@MainActivity).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
-                                prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("Unlock NovaKeys").setSubtitle("Authenticate to access saved credentials").setAllowedAuthenticators(authenticators).build())
-                            } else authError = "Enable a fingerprint or screen lock in Android settings first."
+                            // Create BiometricPrompt only when the user requests vault access.
+                            // This keeps biometric/Fragment initialization out of the cold-start path.
+                            try {
+                                val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                if (BiometricManager.from(this@MainActivity).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
+                                    val prompt = BiometricPrompt(this@MainActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
+                                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                            getSharedPreferences("vault_session", MODE_PRIVATE).edit()
+                                                .putLong("unlocked_until", System.currentTimeMillis() + 300000L).apply()
+                                            unlocked = true
+                                            authError = ""
+                                        }
+                                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                            authError = errString.toString()
+                                        }
+                                        override fun onAuthenticationFailed() {
+                                            authError = "Authentication failed. Try again."
+                                        }
+                                    })
+                                    prompt.authenticate(
+                                        BiometricPrompt.PromptInfo.Builder()
+                                            .setTitle("Unlock NovaKeys")
+                                            .setSubtitle("Authenticate to access saved credentials")
+                                            .setAllowedAuthenticators(authenticators)
+                                            .build()
+                                    )
+                                } else {
+                                    authError = "Enable a fingerprint or screen lock in Android settings first."
+                                }
+                            } catch (error: Exception) {
+                                authError = "Biometric unlock unavailable: ${error.javaClass.simpleName}"
+                            }
                         }, modifier = Modifier.fillMaxWidth()) { Text("Unlock vault") }
                     }
                 }
