@@ -459,7 +459,9 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - Payment-field detection is a conservative heuristic, not a formal guarantee that every payment form is recognized.
 - CSV files contain plaintext passwords. Export only to a location you control, and delete the export securely when no longer needed. Imported CSV rows are also plaintext while the file exists.
 - The vault database is encrypted at rest with SQLCipher; its passphrase is wrapped using an AES-256-GCM Android Keystore key. Device compromise, rooted devices, screenshots, process-memory access, and app-level authorization remain separate threat considerations.
-- This initial version does not yet implement a master-password/biometric gate, a verified inline-presentation renderer, a full domain canonicalization engine, or end-to-end device tests. Do not rely on it as your only password manager until these are implemented and independently tested.
+- The vault screen now requires Android biometric or device-credential authentication; a short five-minute session marker also gates Autofill reads/saves. This is an app-level convenience gate, not a hardware-backed per-secret authentication transaction, and it still requires a security review and device testing.
+- Inline suggestions are not yet verified end-to-end: the IME declares an inline request, but a production inline renderer and device/browser compatibility tests remain outstanding.
+- Domain matching is normalized for common URL/`www.` differences but is not a full public-suffix or subdomain policy engine. Do not rely on this as your only password manager until these gaps are independently tested.
 - The application requests no Internet permission; CSV file access uses Android's Storage Access Framework. Dependencies are resolved during development/CI, not by the installed app.
 
 ### Current status
@@ -471,5 +473,14 @@ The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, 
 - [x] CI workflow and initial unit tests
 - [ ] Confirmed successful CI build and APK installation on a physical device
 - [ ] Inline presentations verified in supported browsers and apps
-- [ ] Security review, biometric/device-credential vault gate, and robust CSV edge-case tests
+- [x] Biometric/device-credential gate for vault UI and five-minute Autofill session gate
+- [ ] Security review, per-dataset Autofill authentication, and robust CSV edge-case tests
 
+
+
+## Latest implementation pass (2026-10-29)
+
+- Added biometric/device-credential authentication before showing the vault screen; successful authentication opens a five-minute local session.
+- Autofill lookup and save requests now require that recent authenticated session, normalize common domain variants, and skip payment-related forms when detected.
+- Added a weak/reused password audit summary and a warning before exporting plaintext CSV.
+- Added Android CI and initial unit tests. **Build status is pending**; the APK must not be considered verified until the workflow finishes successfully and the artifact is tested on a device.
