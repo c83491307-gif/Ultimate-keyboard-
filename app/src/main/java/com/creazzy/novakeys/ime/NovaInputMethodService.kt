@@ -1,11 +1,16 @@
 package com.creazzy.novakeys.ime
 
 import android.content.ClipData
+import android.content.Context
 import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -16,6 +21,7 @@ import android.os.HandlerThread
 import android.provider.MediaStore
 import android.text.InputType
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -43,6 +49,8 @@ class NovaInputMethodService : InputMethodService() {
     private var language = "en"
     private var numeric = false
     private var shifted = false
+    private var drawingMode = false
+    private var drawingCanvas: DrawingCanvasView? = null
     private var root: LinearLayout? = null
     private var screenshotThread: HandlerThread? = null
     private var screenshotHandler: Handler? = null
@@ -125,14 +133,19 @@ class NovaInputMethodService : InputMethodService() {
             language = if (language == "en") "ar" else "en"; rebuild()
         }, LinearLayout.LayoutParams(0, dp(38), 1.25f))
         if (!sensitiveField) {
-            toolbar.addView(toolButton("🖼") { openImageLibrary() }, LinearLayout.LayoutParams(dp(42), dp(38)))
-            toolbar.addView(toolButton("T→IMG") { openTextImage() }, LinearLayout.LayoutParams(dp(62), dp(38)))
+            toolbar.addView(toolButton("🖼") { drawingMode = false; openImageLibrary() }, LinearLayout.LayoutParams(dp(40), dp(38)))
+            toolbar.addView(toolButton("T→IMG") { drawingMode = false; openTextImage() }, LinearLayout.LayoutParams(dp(58), dp(38)))
+            toolbar.addView(toolButton("✎ Draw") { drawingMode = !drawingMode; rebuild() }, LinearLayout.LayoutParams(dp(58), dp(38)))
         }
         toolbar.addView(toolButton(if (numeric) "ABC" else "123") {
             numeric = !numeric; rebuild()
         }, LinearLayout.LayoutParams(dp(48), dp(38)))
         toolbar.addView(toolButton("⌄") { requestHideSelf(0) }, LinearLayout.LayoutParams(dp(34), dp(38)))
         panel.addView(toolbar)
+        if (drawingMode && !sensitiveField) {
+            buildDrawingPanel(panel)
+            return
+        }
         if (!sensitiveField) addRecentImages(panel)
 
         val rows = when {
@@ -169,6 +182,49 @@ class NovaInputMethodService : InputMethodService() {
         bottom.addView(keyButton("Space") { commit(" ") }, LinearLayout.LayoutParams(0, dp(44), 3f).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         bottom.addView(keyButton(if (isLastField()) "✓" else "↵") { handleEnter() }, LinearLayout.LayoutParams(dp(54), dp(44)).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         panel.addView(bottom)
+    }
+
+    private fun buildDrawingPanel(panel: LinearLayout) {
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        controls.addView(label("Draw with finger", 13f, true), LinearLayout.LayoutParams(0, dp(42), 1f))
+        controls.addView(toolButton("Undo") { drawingCanvas?.undo() }, LinearLayout.LayoutParams(dp(58), dp(42)))
+        controls.addView(toolButton("Clear") { drawingCanvas?.clear() }, LinearLayout.LayoutParams(dp(58), dp(42)))
+        controls.addView(toolButton("Cancel") { drawingMode = false; drawingCanvas = null; rebuild() }, LinearLayout.LayoutParams(dp(64), dp(42)))
+        panel.addView(controls)
+        val canvasView = DrawingCanvasView(this).apply {
+            contentDescription = "Drawing canvas. Draw with one finger."
+        }
+        drawingCanvas = canvasView
+        panel.addView(canvasView, LinearLayout.LayoutParams(-1, dp(190)).apply {
+            setMargins(dp(3), dp(4), dp(3), dp(4))
+        })
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        actions.addView(toolButton("Save & insert image") {
+            val drawing = drawingCanvas
+            if (drawing == null || !drawing.hasInk()) {
+                Toast.makeText(this@NovaInputMethodService, "Draw something first", Toast.LENGTH_SHORT).show()
+            } else {
+                val bitmap = drawing.exportBitmap()
+                val saved = runCatching { ScreenshotClipboardStore.saveBitmap(this@NovaInputMethodService, bitmap) }
+                bitmap.recycle()
+                saved.onSuccess { image ->
+                    drawingMode = false
+                    drawingCanvas = null
+                    rebuild()
+                    commitImage(image)
+                }.onFailure {
+                    Toast.makeText(this@NovaInputMethodService, "Could not save drawing: ${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(44)))
+        panel.addView(actions)
+        panel.addView(label("Saved as a local PNG. Image insertion depends on the receiving app.", 10f, false))
     }
 
     private fun addRecentImages(panel: LinearLayout) {
@@ -330,4 +386,88 @@ class NovaInputMethodService : InputMethodService() {
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+}
+
+
+/** Lightweight, offline drawing surface used directly inside the IME window. */
+private class DrawingCanvasView(context: Context) : View(context) {
+    private data class Stroke(val path: Path, val paint: Paint)
+    private val strokes = mutableListOf<Stroke>()
+    private var activePath: Path? = null
+    private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(35, 54, 85)
+        style = Paint.Style.STROKE
+        strokeWidth = 7f * resources.displayMetrics.density
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val backgroundPaint = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL }
+
+    init {
+        setBackgroundColor(Color.WHITE)
+        isFocusable = true
+        isFocusableInTouchMode = true
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        canvas.drawColor(Color.WHITE)
+        strokes.forEach { canvas.drawPath(it.path, it.paint) }
+        activePath?.let { canvas.drawPath(it, activePaint) }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                activePath = Path().apply { moveTo(event.x, event.y) }
+                parent?.requestDisallowInterceptTouchEvent(true)
+                invalidate()
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                activePath?.lineTo(event.x, event.y)
+                invalidate()
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                activePath?.let { path ->
+                    strokes += Stroke(path, Paint(activePaint))
+                }
+                activePath = null
+                invalidate()
+                performClick()
+                return true
+            }
+        }
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
+    fun undo() {
+        if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
+        invalidate()
+    }
+
+    fun clear() {
+        strokes.clear()
+        activePath = null
+        invalidate()
+    }
+
+    fun hasInk(): Boolean = strokes.isNotEmpty() || activePath != null
+
+    fun exportBitmap(): Bitmap {
+        val bitmapWidth = width.coerceAtLeast((resources.displayMetrics.widthPixels - 16).coerceAtLeast(320))
+        val bitmapHeight = height.coerceAtLeast((190 * resources.displayMetrics.density).toInt())
+        val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawRect(0f, 0f, bitmapWidth.toFloat(), bitmapHeight.toFloat(), backgroundPaint)
+        strokes.forEach { canvas.drawPath(it.path, it.paint) }
+        activePath?.let { canvas.drawPath(it, activePaint) }
+        return bitmap
+    }
 }
