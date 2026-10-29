@@ -431,3 +431,45 @@ git push origin feature/your-feature
 **NovaKeys — كتابة أسرع، تخصيص أوسع، وخصوصية أولاً.**
 
 </div>
+
+
+---
+
+## 🔐 Password Manager + Autofill (implementation in progress)
+
+The repository now includes an initial Kotlin/Jetpack Compose Android project scaffold and source files for the password-vault feature. This is source code, not a verified release: the repository has **not yet been confirmed to build**, and no APK should be treated as tested until CI succeeds.
+
+### Implemented source files
+- `PasswordEntry`, `PasswordDao`, and `PasswordDatabase`: Room-backed credential records and search by site.
+- `DatabaseKeyManager`: creates a random 256-bit SQLCipher passphrase and wraps it with an AES-256-GCM key generated in Android Keystore.
+- `NovaAutofillService`: scans autofill structure for username/password fields, proposes saved credentials for matching domains, and uses Android's save flow. It deliberately skips structures identified as payment-related.
+- `NovaInputMethodService`: registers the Android 11+ inline-suggestions request hook; inline UI availability still depends on Android and the target app.
+- `PasswordTools`: cryptographically secure password generation and basic weak/reused-password checks.
+- `PasswordCsv`: CSV import/export support for common Chrome and Bitwarden column names.
+- `MainActivity`: Compose vault UI with search, add/edit/delete, folders, CSV pickers, password generation, and shortcuts to Android's keyboard/autofill settings.
+- `.github/workflows/android.yml`: CI workflow to build a debug APK and run unit tests.
+
+### Build and verify
+The project uses Android SDK 35, JDK 17, Gradle 8.9, Kotlin 2.0.21, Room 2.6.1, and SQLCipher for Android 4.6.1. Open the repository in Android Studio or run `gradle assembleDebug testDebugUnitTest` in an environment with Android SDK 35 installed. The GitHub Actions workflow is intended to provide a repeatable build artifact after a successful run.
+
+### Important security and platform limits
+- Autofill requires the user to explicitly enable NovaKeys under Android Settings → Passwords, passkeys & data / Autofill service. IME activation is a separate user-controlled setting.
+- Android/system UI controls whether an app can receive inline suggestions. The IME request hook does not guarantee inline chips in every browser or app; the Autofill framework may use its fallback UI.
+- The service only sees fields exposed by the host app's Autofill framework. Some browsers and custom login forms do not expose usable field metadata.
+- Payment-field detection is a conservative heuristic, not a formal guarantee that every payment form is recognized.
+- CSV files contain plaintext passwords. Export only to a location you control, and delete the export securely when no longer needed. Imported CSV rows are also plaintext while the file exists.
+- The vault database is encrypted at rest with SQLCipher; its passphrase is wrapped using an AES-256-GCM Android Keystore key. Device compromise, rooted devices, screenshots, process-memory access, and app-level authorization remain separate threat considerations.
+- This initial version does not yet implement a master-password/biometric gate, a verified inline-presentation renderer, a full domain canonicalization engine, or end-to-end device tests. Do not rely on it as your only password manager until these are implemented and independently tested.
+- The application requests no Internet permission; CSV file access uses Android's Storage Access Framework. Dependencies are resolved during development/CI, not by the installed app.
+
+### Current status
+- [x] Initial Android project structure and manifest declarations
+- [x] Encrypted Room/SQLCipher database and Keystore-wrapped database key
+- [x] Initial AutofillService and IME inline-request hook
+- [x] Local password generator and basic weak/reused detection
+- [x] CSV parsing/export utility and Compose management UI
+- [x] CI workflow and initial unit tests
+- [ ] Confirmed successful CI build and APK installation on a physical device
+- [ ] Inline presentations verified in supported browsers and apps
+- [ ] Security review, biometric/device-credential vault gate, and robust CSV edge-case tests
+
