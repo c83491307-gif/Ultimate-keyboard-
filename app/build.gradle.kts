@@ -15,7 +15,6 @@ val hasReleaseSigning = listOf(releaseStorePath, releaseStorePassword, releaseKe
 android {
     namespace = "com.creazzy.novakeys"
     compileSdk = 36
-    compileSdkExtension = 1
 
     defaultConfig {
         applicationId = "com.creazzy.novakeys"
