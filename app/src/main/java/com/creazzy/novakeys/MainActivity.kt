@@ -170,8 +170,6 @@ class MainActivity : ComponentActivity() {
         }) { Text("Save") } },
         dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
     )
-}
-
     if (showExportWarning) AlertDialog(
         onDismissRequest = { showExportWarning = false },
         title = { Text("Export plaintext passwords?") },
@@ -182,3 +180,4 @@ class MainActivity : ComponentActivity() {
         }) { Text("Continue export") } },
         dismissButton = { TextButton(onClick = { showExportWarning = false }) { Text("Cancel") } }
     )
+}
