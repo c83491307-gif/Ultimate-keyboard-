@@ -122,6 +122,12 @@ class MainActivity : FragmentActivity() {
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
+            Button(onClick = {
+                context.startActivity(Intent(context, com.creazzy.novakeys.clipboard.ScreenshotClipboardActivity::class.java))
+            }, modifier = Modifier.fillMaxWidth()) { Text("Screenshot & Image Clipboard") }
+            Button(onClick = {
+                context.startActivity(Intent(context, com.creazzy.novakeys.clipboard.TextToImageActivity::class.java))
+            }, modifier = Modifier.fillMaxWidth()) { Text("Convert copied text to image") }
             Button(onClick = { showAudit = !showAudit }, modifier = Modifier.fillMaxWidth()) { Text(if (showAudit) "Hide password audit" else "Audit weak/reused passwords") }
             if (showAudit) {
                 val findings = PasswordTools.weakOrRepeated(entries.map { it.password })
