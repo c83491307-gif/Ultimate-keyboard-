@@ -49,6 +49,7 @@ class NovaInputMethodService : InputMethodService() {
     private var numeric = false
     private var shifted = false
     private var drawingMode = false
+    private var typographyMode = false
     private var drawingCanvas: DrawingCanvasView? = null
     private var root: LinearLayout? = null
     private var screenshotThread: HandlerThread? = null
@@ -129,6 +130,7 @@ class NovaInputMethodService : InputMethodService() {
         val sensitiveField = isSensitiveInput()
         if (sensitiveField) {
             drawingMode = false
+            typographyMode = false
             drawingCanvas = null
         }
         toolbar.addView(label("NovaKeys", 14f, true), LinearLayout.LayoutParams(0, dp(38), 1f))
@@ -136,6 +138,7 @@ class NovaInputMethodService : InputMethodService() {
             language = if (language == "en") "ar" else "en"; rebuild()
         }, LinearLayout.LayoutParams(0, dp(38), 1.25f))
         if (!sensitiveField) {
+            toolbar.addView(toolButton("Aa") { drawingMode = false; typographyMode = !typographyMode; rebuild() }, LinearLayout.LayoutParams(dp(42), dp(38)))
             toolbar.addView(toolButton("🖼") { drawingMode = false; openImageLibrary() }, LinearLayout.LayoutParams(dp(40), dp(38)))
             toolbar.addView(toolButton("T→IMG") { drawingMode = false; openTextImage() }, LinearLayout.LayoutParams(dp(58), dp(38)))
             toolbar.addView(toolButton("✎ Draw") { drawingMode = !drawingMode; rebuild() }, LinearLayout.LayoutParams(dp(58), dp(38)))
@@ -147,6 +150,10 @@ class NovaInputMethodService : InputMethodService() {
         panel.addView(toolbar)
         if (drawingMode && !sensitiveField) {
             buildDrawingPanel(panel)
+            return
+        }
+        if (typographyMode && !sensitiveField) {
+            buildTypographyPanel(panel)
             return
         }
         if (!sensitiveField) addRecentImages(panel)
@@ -185,6 +192,100 @@ class NovaInputMethodService : InputMethodService() {
         bottom.addView(keyButton("Space") { commit(" ") }, LinearLayout.LayoutParams(0, dp(44), 3f).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         bottom.addView(keyButton(if (isLastField()) "✓" else "↵") { handleEnter() }, LinearLayout.LayoutParams(dp(54), dp(44)).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         panel.addView(bottom)
+    }
+
+    private fun buildTypographyPanel(panel: LinearLayout) {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(label("Unicode styles · select text first", 13f, true), LinearLayout.LayoutParams(0, dp(38), 1f))
+        header.addView(toolButton("Done") { typographyMode = false; rebuild() }, LinearLayout.LayoutParams(dp(62), dp(38)))
+        panel.addView(header)
+        val scroller = android.widget.ScrollView(this).apply {
+            isFillViewport = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(2), dp(2), dp(2), dp(6))
+        }
+        val styles = listOf(
+            UnicodeTextStyles.Style.BOLD, UnicodeTextStyles.Style.ITALIC, UnicodeTextStyles.Style.BOLD_ITALIC,
+            UnicodeTextStyles.Style.SCRIPT, UnicodeTextStyles.Style.FRAKTUR, UnicodeTextStyles.Style.DOUBLE_STRUCK,
+            UnicodeTextStyles.Style.SANS, UnicodeTextStyles.Style.MONOSPACE, UnicodeTextStyles.Style.FULLWIDTH,
+            UnicodeTextStyles.Style.CIRCLED, UnicodeTextStyles.Style.SMALL_CAPS, UnicodeTextStyles.Style.LEET,
+            UnicodeTextStyles.Style.GLITCH
+        )
+        styles.chunked(3).forEach { group ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            group.forEach { style ->
+                row.addView(toolButton(style.title) { transformSelection(style) },
+                    LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+            }
+            repeat(3 - group.size) { row.addView(View(this), LinearLayout.LayoutParams(0, dp(38), 1f)) }
+            content.addView(row)
+        }
+        content.addView(label("Frames and decorations", 12f, true))
+        val decorations = listOf(
+            "꧁ ꧂" to "frame", "༒ ༒" to "gothic", "✦ ✧" to "stars",
+            "♡ ♥" to "heart", "『 』" to "brackets", "➶ ⇢" to "arrows",
+            "[ root ]" to "terminal", "ᚺᚨ ᚾᛟ" to "runes"
+        )
+        decorations.chunked(4).forEach { group ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            group.forEach { (title, key) ->
+                row.addView(toolButton(title) { decorateSelection(key) },
+                    LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+            }
+            repeat(4 - group.size) { row.addView(View(this), LinearLayout.LayoutParams(0, dp(38), 1f)) }
+            content.addView(row)
+        }
+        content.addView(label("Tap a symbol to insert it", 12f, true))
+        val symbolGroups = listOf(
+            listOf("★", "☆", "✦", "✧", "✩", "✪", "⋆", "⁂", "✺"),
+            listOf("♡", "♥", "❤", "❥", "❣", "ღ", "۵", "დ"),
+            listOf("꧁", "꧂", "༒", "༄", "༅", "彡", "⟡", "『", "』", "【", "】"),
+            listOf("➶", "➷", "⇢", "↳", "→", "┊", "╰", "╯", "─", "•"),
+            listOf("☠", "☢", "☣", "⚰", "⚔", "♛", "♚", "⛧", "♔", "♕", "♖", "♗", "♘", "♙")
+        )
+        symbolGroups.forEach { symbols ->
+            val horizontal = HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(LinearLayout(this@NovaInputMethodService).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    symbols.forEach { symbol ->
+                        addView(toolButton(symbol) { commit(symbol) }, LinearLayout.LayoutParams(dp(42), dp(38)).apply {
+                            setMargins(dp(2), dp(2), dp(2), dp(2))
+                        })
+                    }
+                })
+            }
+            content.addView(horizontal)
+        }
+        content.addView(label("Unicode styles change characters, not installed fonts. Arabic and other scripts mostly keep their letters; use frames and symbols around them.", 10f, false))
+        scroller.addView(content)
+        panel.addView(scroller, LinearLayout.LayoutParams(-1, dp(238)))
+    }
+
+    private fun transformSelection(style: UnicodeTextStyles.Style) {
+        val connection = currentInputConnection
+        val selected = connection?.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isBlank()) {
+            Toast.makeText(this, "Select text in the app first, then choose a style.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        connection.commitText(UnicodeTextStyles.transform(selected, style), 1)
+    }
+
+    private fun decorateSelection(decoration: String) {
+        val connection = currentInputConnection
+        val selected = connection?.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isBlank()) {
+            Toast.makeText(this, "Select text in the app first, then choose a decoration.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        connection.commitText(UnicodeTextStyles.decorate(selected, decoration), 1)
     }
 
     private fun buildDrawingPanel(panel: LinearLayout) {
