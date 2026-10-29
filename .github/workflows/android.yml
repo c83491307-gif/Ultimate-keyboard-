@@ -28,7 +28,7 @@ jobs:
         with:
           gradle-version: "8.13"
       - name: Build debug APK, run unit tests, and lint
-        run: gradle assembleDebug testDebugUnitTest lintDebug
+        run: gradle assembleDebug assembleRelease testDebugUnitTest lintDebug
       - name: Verify debug APK and prepare alternate download
         shell: bash
         run: |
@@ -46,7 +46,11 @@ jobs:
           cp "$APK" release-assets/app-debug.apk
           (cd release-assets && zip -9 app-debug-apk.zip app-debug.apk)
           (cd release-assets && sha256sum app-debug.apk app-debug-apk.zip > SHA256SUMS-debug.txt)
-          echo "Verified debug APK and created ZIP/checksum alternatives."
+          RELEASE_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -s "$RELEASE_APK"
+          unzip -t "$RELEASE_APK"
+          unzip -Z1 "$RELEASE_APK" | grep -qx 'AndroidManifest.xml'
+          echo "Verified debug APK and unsigned release variant; production publishing still requires a valid release signature."
       - name: Upload debug APK and fallback downloads
         uses: actions/upload-artifact@v4
         with:
