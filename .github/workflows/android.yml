@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -36,9 +36,22 @@ jobs:
           unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?[.]dex$'
           unzip -Z1 "$APK" | grep -qx 'resources.arsc'
           echo "Verified single, complete debug APK archive."
-      - name: Upload full installable APK
+      - name: Upload full installable APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: novakeys-full-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Publish or replace public latest APK release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: NovaKeys — Latest successful build
+          body: |
+            Automatically updated from the latest successful build on main.
+            This is a debug APK for testing, not a Play Store production-signed release.
+          prerelease: true
+          make_latest: false
+          files: app/build/outputs/apk/debug/app-debug.apk
+          fail_on_unmatched_files: true
