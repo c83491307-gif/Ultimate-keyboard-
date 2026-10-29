@@ -13,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 
 class NovaAutofillService : AutofillService() {
     override fun onFillRequest(request: FillRequest, cancellationSignal: CancellationSignal, callback: FillCallback) {
+        if (!isVaultUnlocked()) { callback.onSuccess(null); return }
         if (cancellationSignal.isCanceled) { callback.onFailure("Request cancelled"); return }
         val structure = request.fillContexts.lastOrNull()?.structure
         val parsed = structure?.let(::parseStructure)
@@ -50,6 +51,7 @@ class NovaAutofillService : AutofillService() {
     }
 
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
+        if (!isVaultUnlocked()) { callback.onFailure("Unlock NovaKeys before saving credentials."); return }
         val structure = request.fillContexts.lastOrNull()?.structure
         val parsed = structure?.let(::parseStructure)
         if (parsed == null || parsed.payment) { callback.onSuccess(); return }
@@ -106,6 +108,9 @@ class NovaAutofillService : AutofillService() {
         for (i in 0 until structure.windowNodeCount) visit(structure.getWindowNodeAt(i).rootViewNode)
         return Parsed(domain.ifBlank { "unknown" }, userId, passId, userValue, passValue, payment)
     }
+
+    private fun isVaultUnlocked(): Boolean =
+        getSharedPreferences("vault_session", MODE_PRIVATE).getLong("unlocked_until", 0L) > System.currentTimeMillis()
 
     private fun normalizeDomain(raw: String): String {
         val value = raw.trim().lowercase()
