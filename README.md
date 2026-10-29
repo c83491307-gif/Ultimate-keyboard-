@@ -5,17 +5,19 @@
 ### لوحة مفاتيح ذكية: Clipboard • OCR • Universal Copy • ثيمات قابلة للتخصيص
 
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
 ![Privacy](https://img.shields.io/badge/Privacy-Offline%20First-success)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Status](https://img.shields.io/badge/Status-Active%20development-orange)
+![Status](https://img.shields.io/badge/Status-Beta%20%7C%20device%20testing%20required-orange)
 
 </div>
 
-> **حالة المشروع بشفافية (2026-10-29):** أصبح المستودع يحتوي على خدمة لوحة مفاتيح عربية/إنجليزية أساسية، ومدير كلمات مرور، وحافظة صور متعددة العناصر، وتحويل النص والإيموجي إلى PNG، وخدمة Autofill أولية. نجح بناء Debug وتشغيل اختبارات الوحدة ورفع APK كـ CI artifact للالتزام البرمجي `8335878a` في GitHub Actions. لا يعد ذلك اختبارًا على هاتف فعلي أو إصدار Release موقّعًا. هذا لا يثبت اختباراً على جهاز فعلي، ولا يعني اكتمال كل المميزات المذكورة أدناه. ملف APK متاح كـ CI artifact مؤقت وليس إصداراً رسمياً منشوراً.
+> **حالة المشروع بشفافية (2026-10-29):** نجح آخر تشغيل موثق لـ GitHub Actions على الالتزام `cc6083b1` في بناء Debug وRelease غير موقّع، وتشغيل اختبارات الوحدة وLint، والتحقق من سلامة APK، ونشر حزمة اختبار Debug في إصدار `latest`. هذا تحقق آلي للبناء فقط؛ ليس اختبارًا على هاتف فعلي ولا إصدارًا إنتاجيًا موقّعًا. ما زالت بعض الوظائف في الجداول أدناه مخططة أو قيد التحقق، ولا ينبغي اعتبار كل ميزة مذكورة مكتملة. راجع [تنزيلات الاختبار](https://github.com/c83491307-gif/Ultimate-keyboard-/releases/tag/latest)، و[سياسة الخصوصية](PRIVACY.md)، و[إرشادات الأمان](SECURITY.md).
 
 ## 📖 نظرة عامة
+
+> **تنبيه قبل الاستخدام الافتراضي:** لا تعتمد على NovaKeys وحده لإدخال كلمات مرور أو بيانات حساسة قبل إتمام الاختبارات على جهازك. لوحة المفاتيح تتعامل مع النص الذي تكتبه داخل التطبيقات؛ استخدم فقط إصدارًا تثق به، وراجع سياسة الخصوصية وإعدادات النظام. لا يحتوي المشروع على تسجيل Gmail إلزامي أو مزامنة سحابية مفروضة.
 
 **NovaKeys** مشروع لوحة مفاتيح أندرويد يهدف إلى جمع تجربة كتابة قابلة للتخصيص، ومدير حافظة، واستخراج النصوص من الصور، وأدوات مساعدة في تطبيق واحد. الأولوية للسرعة والخصوصية والمعالجة المحلية حيثما أمكن.
 
