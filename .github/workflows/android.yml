@@ -24,7 +24,6 @@ jobs:
         with:
           gradle-version: "8.13"
       - name: Build debug APK, run unit tests, and lint
-        env:
         run: gradle assembleDebug testDebugUnitTest lintDebug
       - name: Verify APK and prepare alternate download
         shell: bash
