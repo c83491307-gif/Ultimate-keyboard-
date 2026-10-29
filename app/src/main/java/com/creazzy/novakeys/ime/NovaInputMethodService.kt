@@ -14,11 +14,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.provider.MediaStore
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputContentInfo
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -31,6 +30,9 @@ import com.creazzy.novakeys.clipboard.ScreenshotClipboardActivity
 import com.creazzy.novakeys.clipboard.ScreenshotClipboardStore
 import com.creazzy.novakeys.clipboard.TextToImageActivity
 import java.io.File
+import androidx.core.view.inputmethod.EditorInfoCompat
+import androidx.core.view.inputmethod.InputConnectionCompat
+import androidx.core.view.inputmethod.InputContentInfoCompat
 
 /**
  * Bilingual keyboard with a persistent local image strip.
@@ -117,18 +119,21 @@ class NovaInputMethodService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+        val sensitiveField = isSensitiveInput()
         toolbar.addView(label("NovaKeys", 14f, true), LinearLayout.LayoutParams(0, dp(38), 1f))
         toolbar.addView(toolButton(if (language == "en") "EN · عربي" else "عربي · EN") {
             language = if (language == "en") "ar" else "en"; rebuild()
         }, LinearLayout.LayoutParams(0, dp(38), 1.25f))
-        toolbar.addView(toolButton("🖼") { openImageLibrary() }, LinearLayout.LayoutParams(dp(42), dp(38)))
-        toolbar.addView(toolButton("T→IMG") { openTextImage() }, LinearLayout.LayoutParams(dp(62), dp(38)))
+        if (!sensitiveField) {
+            toolbar.addView(toolButton("🖼") { openImageLibrary() }, LinearLayout.LayoutParams(dp(42), dp(38)))
+            toolbar.addView(toolButton("T→IMG") { openTextImage() }, LinearLayout.LayoutParams(dp(62), dp(38)))
+        }
         toolbar.addView(toolButton(if (numeric) "ABC" else "123") {
             numeric = !numeric; rebuild()
         }, LinearLayout.LayoutParams(dp(48), dp(38)))
         toolbar.addView(toolButton("⌄") { requestHideSelf(0) }, LinearLayout.LayoutParams(dp(34), dp(38)))
         panel.addView(toolbar)
-        addRecentImages(panel)
+        if (!sensitiveField) addRecentImages(panel)
 
         val rows = when {
             numeric -> listOf(listOf("1","2","3"), listOf("4","5","6"), listOf("7","8","9"), listOf("-","0",",","."))
@@ -204,22 +209,43 @@ class NovaInputMethodService : InputMethodService() {
         panel.addView(scroll, LinearLayout.LayoutParams(-1, dp(50)))
     }
 
+    private fun isSensitiveInput(): Boolean {
+        val type = currentInputEditorInfo?.inputType ?: return false
+        val inputClass = type and InputType.TYPE_MASK_CLASS
+        val variation = type and InputType.TYPE_MASK_VARIATION
+        return when (inputClass) {
+            InputType.TYPE_CLASS_TEXT -> variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+            InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            else -> false
+        }
+    }
+
     private fun commitImage(image: ClipboardImage) {
+        if (isSensitiveInput()) {
+            Toast.makeText(this, "Image clipboard is hidden for password fields", Toast.LENGTH_SHORT).show()
+            return
+        }
         val uri = runCatching { ScreenshotClipboardStore.uriFor(this, image) }.getOrElse {
             Toast.makeText(this, "Image is no longer available", Toast.LENGTH_SHORT).show()
             return
         }
         val mime = ScreenshotClipboardStore.mimeType(image)
-        val supportedTypes = currentInputEditorInfo?.contentMimeTypes
+        val editorInfo = currentInputEditorInfo
+        val supportedTypes = editorInfo?.let { EditorInfoCompat.getContentMimeTypes(it) }
         val editorSupportsImage = supportedTypes?.any { type ->
-            ClipDescription.compareMimeTypes(mime, type) || ClipDescription.compareMimeTypes(type, mime)
+            ClipDescription.compareMimeTypes(mime, type)
         } == true
         val connection = currentInputConnection
-        if (editorSupportsImage && connection != null) {
+        if (editorSupportsImage && connection != null && editorInfo != null) {
             val description = ClipDescription(image.fileName, arrayOf(mime))
-            val content = InputContentInfo(uri, description, null)
+            val content = InputContentInfoCompat(uri, description, null)
             val accepted = runCatching {
-                connection.commitContent(content, InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, Bundle())
+                InputConnectionCompat.commitContent(
+                    connection, editorInfo, content,
+                    InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, Bundle()
+                )
             }.getOrDefault(false)
             if (accepted) {
                 Toast.makeText(this, "Image sent to the current app", Toast.LENGTH_SHORT).show()
