@@ -24,6 +24,11 @@ jobs:
         with:
           gradle-version: "8.11.1"
       - name: Build debug APK, run unit tests, and lint
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: gradle assembleDebug testDebugUnitTest lintDebug
       - name: Verify APK and prepare alternate download
         shell: bash
