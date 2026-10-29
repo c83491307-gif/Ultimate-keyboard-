@@ -340,7 +340,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
         onDismissRequest = { showBackupPassphrase = false; backupPassphrase = "" },
         title = { Text(when (backupAction) {
             "export" -> "Encrypt backup"
-            "import" -> "Decrypt phone backup"
+            "folderExport" -> "Encrypt backup to NovaKeys folder"
             else -> "Decrypt phone backup"
         }) },
         text = {
