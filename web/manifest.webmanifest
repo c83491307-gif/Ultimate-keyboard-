@@ -1,0 +1,13 @@
+{
+  "name": "NovaKeys — كتابة وأنماط Unicode",
+  "short_name": "NovaKeys",
+  "description": "أداة تنسيق نصوص Unicode مع تنزيل لوحة مفاتيح Android.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f1eb",
+  "theme_color": "#f4f1eb",
+  "icons": []
+}
