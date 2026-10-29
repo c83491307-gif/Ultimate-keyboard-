@@ -1,16 +1,20 @@
 package com.creazzy.novakeys.autofill
 
 import android.app.assist.AssistStructure
+import android.os.Build
 import android.os.CancellationSignal
 import android.service.autofill.*
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
+import androidx.annotation.RequiresApi
 import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
+/** Autofill framework is available from Android 8.0 (API 26); older Android versions use the keyboard without this service. */
+@RequiresApi(Build.VERSION_CODES.O)
 class NovaAutofillService : AutofillService() {
     override fun onFillRequest(request: FillRequest, cancellationSignal: CancellationSignal, callback: FillCallback) {
         if (!isVaultUnlocked()) { callback.onSuccess(null); return }
