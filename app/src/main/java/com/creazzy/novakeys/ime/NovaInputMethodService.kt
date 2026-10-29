@@ -1,15 +1,18 @@
 package com.creazzy.novakeys.ime
 
 import android.inputmethodservice.InputMethodService
+import android.os.Build
+import android.os.Bundle
+import android.util.Size
 import android.view.View
+import android.view.inputmethod.InlinePresentationSpec
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
-import android.os.Bundle
 import android.widget.TextView
 
 /**
- * Minimal IME host for inline autofill. The platform AutofillService owns credential
- * matching; Android decides whether inline presentation is supported by the focused app.
+ * IME-side request hook for Android 11+ inline autofill. Actual credential matching
+ * and consent are handled by the system Autofill framework and NovaAutofillService.
  */
 class NovaInputMethodService : InputMethodService() {
     override fun onCreateInputView(): View = TextView(this).apply {
@@ -19,19 +22,16 @@ class NovaInputMethodService : InputMethodService() {
     }
 
     override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
-        if (android.os.Build.VERSION.SDK_INT < 30) return null
-        return InlineSuggestionsRequest.Builder(
-            android.view.inputmethod.InlinePresentationSpec(
-                android.util.Size(220, 48),
-                android.view.inputmethod.InlineSuggestionUi.getStyle(this)
-            )
-        ).setMaxSuggestionCount(3).build()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val spec = InlinePresentationSpec.Builder(Size(240, 48), Bundle()).build()
+        return InlineSuggestionsRequest.Builder(listOf(spec))
+            .setMaxSuggestionCount(3)
+            .build()
     }
 
     override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
-        // Android's inline UI is rendered by the system/host app; returning true means
-        // the IME accepts the response. A full production keyboard should render its own
-        // suggestions strip for platforms/apps without inline support.
+        // Returning true allows the framework to deliver inline suggestions to the host.
+        // Apps that do not support inline UI fall back to the platform autofill UI.
         return true
     }
 }
