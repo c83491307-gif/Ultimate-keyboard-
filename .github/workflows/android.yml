@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: novakeys-${{ github.ref }}
@@ -61,8 +61,21 @@ jobs:
             release-assets/SHA256SUMS-debug.txt
           if-no-files-found: error
           retention-days: 30
+
+  publish_debug:
+    name: Publish latest debug test build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified debug artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: novakeys-debug-downloads
+          path: release-assets
       - name: Publish latest debug test build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -87,6 +100,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
