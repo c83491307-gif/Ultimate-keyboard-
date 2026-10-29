@@ -80,6 +80,7 @@ class MainActivity : FragmentActivity() {
     var showForm by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var showExportWarning by remember { mutableStateOf(false) }
+    var exportBitwarden by remember { mutableStateOf(false) }
     var showAudit by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -93,7 +94,13 @@ class MainActivity : FragmentActivity() {
     }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) scope.launch {
-            runCatching { PasswordCsv.export(context.contentResolver, uri, entries); status = "CSV exported" }
+            runCatching { PasswordCsv.export(context.contentResolver, uri, entries); status = "Chrome-compatible CSV exported" }
+                .onFailure { status = "Export failed: ${it.message ?: "could not write file"}" }
+        }
+    }
+    val bitwardenExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch {
+            runCatching { PasswordCsv.exportBitwarden(context.contentResolver, uri, entries); status = "Bitwarden-compatible CSV exported" }
                 .onFailure { status = "Export failed: ${it.message ?: "could not write file"}" }
         }
     }
@@ -109,7 +116,7 @@ class MainActivity : FragmentActivity() {
             OutlinedTextField(query, { query = it }, label = { Text("بحث / Search") }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import CSV") }
-                OutlinedButton(onClick = { showExportWarning = true }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
+                OutlinedButton(onClick = { exportBitwarden = false; showExportWarning = true }, modifier = Modifier.weight(1f)) { Text("Export CSV") }
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
@@ -176,7 +183,8 @@ class MainActivity : FragmentActivity() {
         text = { Text("CSV exports contain readable passwords. Save only to a trusted location, do not share the file, and delete it when finished.") },
         confirmButton = { TextButton(onClick = {
             showExportWarning = false
-            exportLauncher.launch("novakeys-passwords.csv")
+            if (exportBitwarden) bitwardenExportLauncher.launch("novakeys-bitwarden.csv")
+            else exportLauncher.launch("novakeys-passwords.csv")
         }) { Text("Continue export") } },
         dismissButton = { TextButton(onClick = { showExportWarning = false }) { Text("Cancel") } }
     )
