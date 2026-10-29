@@ -3,6 +3,7 @@ package com.creazzy.novakeys
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -25,9 +26,17 @@ import com.creazzy.novakeys.security.PasswordTools
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
+    private var resumeTick by mutableIntStateOf(0)
+
+    override fun onResume() {
+        super.onResume()
+        resumeTick++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val currentResumeTick = resumeTick
             var unlocked by remember { mutableStateOf(false) }
             var authError by remember { mutableStateOf("") }
             val executor = remember { ContextCompat.getMainExecutor(this@MainActivity) }
@@ -49,6 +58,8 @@ class MainActivity : FragmentActivity() {
                     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
                         Text("NovaKeys Vault", style = MaterialTheme.typography.headlineMedium)
                         Text("Unlock with your fingerprint or device screen lock.")
+                        KeyboardSetupCard(refreshKey = currentResumeTick)
+                        Spacer(Modifier.height(12.dp))
                         if (authError.isNotBlank()) Text(authError, color = MaterialTheme.colorScheme.error)
                         Button(onClick = {
                             val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -59,6 +70,45 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun KeyboardSetupCard(refreshKey: Int) {
+    val context = LocalContext.current
+    val componentId = "${context.packageName}/${com.creazzy.novakeys.ime.NovaInputMethodService::class.java.name}"
+    // Reading these values again on Activity resume reflects changes made in Android Settings.
+    @Suppress("UNUSED_VARIABLE") val resumeRefresh = refreshKey
+    val enabledMethods = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+    val defaultMethod = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+    val enabled = com.creazzy.novakeys.ime.KeyboardSetupState.isEnabled(enabledMethods, componentId)
+    val isDefault = com.creazzy.novakeys.ime.KeyboardSetupState.isDefault(defaultMethod, componentId)
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Keyboard setup", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when {
+                    isDefault -> "NovaKeys is your current default keyboard."
+                    enabled -> "NovaKeys is enabled. Select it as the default keyboard to start using it."
+                    else -> "Step 1: enable NovaKeys. Step 2: choose it as the default keyboard."
+                },
+                color = if (isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedButton(onClick = {
+                runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
+                    .onFailure { android.widget.Toast.makeText(context, "Could not open keyboard settings", android.widget.Toast.LENGTH_LONG).show() }
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (enabled) "Manage enabled keyboards" else "1 · Enable NovaKeys")
+            }
+            Button(onClick = {
+                runCatching {
+                    val manager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    manager.showInputMethodPicker()
+                }.onFailure {
+                    android.widget.Toast.makeText(context, "Open a text field to choose a keyboard", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text(if (isDefault) "Switch keyboard" else "2 · Choose default keyboard") }
         }
     }
 }
@@ -120,8 +170,7 @@ class MainActivity : FragmentActivity() {
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
-            Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } },
-                modifier = Modifier.fillMaxWidth()) { Text("Enable NovaKeys keyboard") }
+            KeyboardSetupCard(refreshKey = 0)
             Button(onClick = {
                 context.startActivity(Intent(context, com.creazzy.novakeys.clipboard.ScreenshotClipboardActivity::class.java))
             }, modifier = Modifier.fillMaxWidth()) { Text("Screenshot & Image Clipboard") }
