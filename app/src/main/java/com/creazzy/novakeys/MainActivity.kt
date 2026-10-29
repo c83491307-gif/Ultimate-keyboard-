@@ -1,5 +1,6 @@
 package com.creazzy.novakeys
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -53,7 +54,7 @@ class MainActivity : FragmentActivity() {
             }
             MaterialTheme {
                 if (unlocked && getSharedPreferences("vault_session", MODE_PRIVATE).getLong("unlocked_until", 0L) > System.currentTimeMillis()) {
-                    VaultScreen()
+                    VaultScreen(refreshKey = currentResumeTick)
                 } else {
                     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
                         Text("NovaKeys Vault", style = MaterialTheme.typography.headlineMedium)
@@ -114,7 +115,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun VaultScreen() {
+@Composable private fun VaultScreen(refreshKey: Int) {
     val context = LocalContext.current
     val dao = remember { PasswordDatabase.get(context).passwords() }
     val scope = rememberCoroutineScope()
@@ -170,7 +171,7 @@ private fun KeyboardSetupCard(refreshKey: Int) {
             }
             Button(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).setData(android.net.Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth()) { Text("Enable Autofill in Android Settings") }
-            KeyboardSetupCard(refreshKey = 0)
+            KeyboardSetupCard(refreshKey = refreshKey)
             Button(onClick = {
                 context.startActivity(Intent(context, com.creazzy.novakeys.clipboard.ScreenshotClipboardActivity::class.java))
             }, modifier = Modifier.fillMaxWidth()) { Text("Screenshot & Image Clipboard") }
