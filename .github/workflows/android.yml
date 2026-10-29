@@ -22,7 +22,7 @@ jobs:
           gradle-version: "8.9"
       - name: Build debug APK and run unit tests
         run: gradle assembleDebug testDebugUnitTest
-      - name: Verify complete installable APK
+      - name: Verify APK and prepare alternate download
         shell: bash
         run: |
           set -euo pipefail
@@ -35,12 +35,19 @@ jobs:
           unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
           unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?[.]dex$'
           unzip -Z1 "$APK" | grep -qx 'resources.arsc'
-          echo "Verified single, complete debug APK archive."
-      - name: Upload full installable APK artifact
+          mkdir -p release-assets
+          cp "$APK" release-assets/app-debug.apk
+          (cd release-assets && zip -9 app-debug-apk.zip app-debug.apk)
+          (cd release-assets && sha256sum app-debug.apk app-debug-apk.zip > SHA256SUMS.txt)
+          echo "Verified APK and created ZIP/checksum alternatives."
+      - name: Upload installable APK and fallback downloads
         uses: actions/upload-artifact@v4
         with:
           name: novakeys-full-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            release-assets/app-debug.apk
+            release-assets/app-debug-apk.zip
+            release-assets/SHA256SUMS.txt
           if-no-files-found: error
       - name: Publish or replace public latest APK release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -50,8 +57,15 @@ jobs:
           name: NovaKeys — Latest successful build
           body: |
             Automatically updated from the latest successful build on main.
+            Direct APK: app-debug.apk
+            Alternative for download managers that stall on APK files: app-debug-apk.zip (extract app-debug.apk before installing).
+            SHA-256 checksums: SHA256SUMS.txt
             This is a debug APK for testing, not a Play Store production-signed release.
           prerelease: true
           make_latest: false
-          files: app/build/outputs/apk/debug/app-debug.apk
+          overwrite_files: true
+          files: |
+            release-assets/app-debug.apk
+            release-assets/app-debug-apk.zip
+            release-assets/SHA256SUMS.txt
           fail_on_unmatched_files: true
