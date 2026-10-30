@@ -52,7 +52,7 @@ jobs:
           unzip -Z1 "$RELEASE_APK" | grep -qx 'AndroidManifest.xml'
           echo "Verified debug APK and unsigned release variant; production publishing still requires a valid release signature."
       - name: Upload debug APK and fallback downloads
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: novakeys-debug-downloads
           path: |
@@ -88,7 +88,7 @@ jobs:
           script: bash .github/scripts/android-emulator-smoke.sh emulator-input/app-debug.apk
       - name: Upload emulator diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: novakeys-emulator-test-results
           path: emulator-test-results/
