@@ -12,6 +12,8 @@ capture_diagnostics() {
   adb logcat -d -v threadtime > "$RESULTS_DIR/logcat.txt" 2>&1 || true
   adb shell dumpsys input_method > "$RESULTS_DIR/input-method.txt" 2>&1 || true
   adb shell dumpsys activity activities > "$RESULTS_DIR/activities.txt" 2>&1 || true
+  adb shell dumpsys window windows > "$RESULTS_DIR/windows.txt" 2>&1 || true
+  adb shell dumpsys package "$PACKAGE" > "$RESULTS_DIR/package.txt" 2>&1 || true
 }
 
 fail() {
@@ -59,11 +61,10 @@ for attempt in $(seq 1 45); do
 done
 [[ "$HOST_VISIBLE" == true ]] || fail "IME smoke host activity did not become visible"
 
-# The test activity calls showSoftInput after its window receives focus. A tap
-# also exercises the normal user path and avoids a false failure if focus is delayed.
-adb shell input tap 420 190 || true
+# The debug host requests the keyboard only after its real editor owns focus.
+# Avoid coordinate taps: fixed screen coordinates are density/layout dependent.
 IME_VISIBLE=false
-for attempt in $(seq 1 30); do
+for attempt in $(seq 1 60); do
   adb shell dumpsys input_method > "$RESULTS_DIR/input-method.txt" 2>&1 || true
   if grep -Fq "mCurId=$IME_COMPONENT" "$RESULTS_DIR/input-method.txt" &&
      grep -Eiq 'mInputShown=true|mShowRequested=true|inputShown=true' "$RESULTS_DIR/input-method.txt"; then
