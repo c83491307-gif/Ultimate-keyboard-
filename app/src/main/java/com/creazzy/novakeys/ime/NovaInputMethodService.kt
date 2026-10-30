@@ -68,19 +68,38 @@ class NovaInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        screenshotThread = HandlerThread("NovaKeysScreenshotObserver").apply { start() }
-        screenshotHandler = Handler(screenshotThread!!.looper)
-        screenshotObserver = object : ContentObserver(screenshotHandler) {
+        val observerThread = HandlerThread("NovaKeysScreenshotObserver")
+        runCatching { observerThread.start() }.onFailure {
+            observerThread.quitSafely()
+            return
+        }
+        val observerHandler = runCatching { Handler(observerThread.looper) }.getOrNull()
+        if (observerHandler == null) {
+            observerThread.quitSafely()
+            return
+        }
+        screenshotThread = observerThread
+        screenshotHandler = observerHandler
+        val observer = object : ContentObserver(observerHandler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
                 screenshotHandler?.removeCallbacks(pendingScreenshotScan)
                 screenshotHandler?.postDelayed(pendingScreenshotScan, 1100L)
             }
         }
-        runCatching {
+        screenshotObserver = observer
+        val registered = runCatching {
             contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, screenshotObserver!!
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer
             )
+        }.isSuccess
+        if (!registered) {
+            screenshotObserver = null
+            observerHandler.removeCallbacks(pendingScreenshotScan)
+            observerThread.quitSafely()
+            screenshotHandler = null
+            screenshotThread = null
+            return
         }
         // Resume any opt-in sync that was enabled before the keyboard service started.
         screenshotHandler?.postDelayed(pendingScreenshotScan, 500L)
@@ -111,13 +130,14 @@ class NovaInputMethodService : InputMethodService() {
     }
 
     private fun buildKeyboard(): View {
-        root = LinearLayout(this).apply {
+        val keyboardRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(6), dp(5), dp(8))
             setBackgroundColor(Color.rgb(235, 239, 245))
         }
+        root = keyboardRoot
         rebuild()
-        return root!!
+        return keyboardRoot
     }
 
     private fun rebuild() {
