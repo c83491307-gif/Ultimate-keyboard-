@@ -11,6 +11,7 @@ import androidx.annotation.RequiresApi
 import com.creazzy.novakeys.data.PasswordDatabase
 import com.creazzy.novakeys.data.PasswordEntry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,7 +19,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Autofill is available from API 26; this app currently requires API 31. */
@@ -42,13 +42,8 @@ class NovaAutofillService : AutofillService() {
         callback: FillCallback
     ) {
         val completed = AtomicBoolean(false)
-        lateinit var job: Job
-        cancellationSignal.setOnCancelListener {
-            if (::job.isInitialized) job.cancel(CancellationException("Autofill request cancelled"))
-        }
         if (cancellationSignal.isCanceled) return
-
-        job = serviceScope.launch {
+        val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             try {
                 if (!isVaultUnlocked()) {
                     complete(completed) { callback.onSuccess(null) }
@@ -113,6 +108,10 @@ class NovaAutofillService : AutofillService() {
                 }
             }
         }
+        cancellationSignal.setOnCancelListener {
+            job.cancel(CancellationException("Autofill request cancelled"))
+        }
+        if (cancellationSignal.isCanceled) job.cancel() else job.start()
     }
 
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
