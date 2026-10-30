@@ -25,6 +25,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
       - name: Build debug APK, run unit tests, and lint
         run: gradle assembleDebug assembleRelease testDebugUnitTest lintDebug
       - name: Verify debug APK and prepare alternate download
@@ -140,6 +142,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
       - name: Validate release signing secrets
         shell: bash
         env:
