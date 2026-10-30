@@ -26,8 +26,21 @@ adb shell pm path "$PACKAGE" | grep -q "package:" || fail "NovaKeys package is n
 
 echo "Launching the app and checking for startup crashes..."
 adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1
-sleep 3
-adb shell pidof "$PACKAGE" >/dev/null || fail "NovaKeys process exited after launch"
+
+# The emulator can be heavily loaded immediately after first boot. monkey may
+# return before ActivityManager has finished creating the app process, so poll
+# for startup instead of treating a short scheduling delay as an app crash.
+APP_PID=""
+for attempt in $(seq 1 60); do
+  APP_PID="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\\r' || true)"
+  if [[ -n "$APP_PID" ]]; then
+    break
+  fi
+  sleep 1
+done
+if [[ -z "$APP_PID" ]]; then
+  fail "NovaKeys process did not start within 60 seconds after launch"
+fi
 
 echo "Enabling NovaKeys as the active emulator input method..."
 adb shell ime enable "$IME_COMPONENT"
