@@ -102,10 +102,22 @@ private fun KeyboardSetupCard(refreshKey: Int) {
     val componentId = "${context.packageName}/${com.creazzy.novakeys.ime.NovaInputMethodService::class.java.name}"
     // Reading these values again on Activity resume reflects changes made in Android Settings.
     @Suppress("UNUSED_VARIABLE") val resumeRefresh = refreshKey
-    val enabledMethods = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
-    val defaultMethod = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-    val enabled = com.creazzy.novakeys.ime.KeyboardSetupState.isEnabled(enabledMethods, componentId)
-    val isDefault = com.creazzy.novakeys.ime.KeyboardSetupState.isDefault(defaultMethod, componentId)
+    val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    // Android 14+ restricts Settings.Secure.ENABLED_INPUT_METHODS for apps targeting API 34+.
+    // Query the supported InputMethodManager API instead; never read that private settings key.
+    val enabled = runCatching {
+        inputMethodManager.enabledInputMethodList.any { it.id.equals(componentId, ignoreCase = true) }
+    }.getOrDefault(false)
+    // getCurrentInputMethodInfo() is public from API 34. Older supported releases use the
+    // legacy default-method setting, guarded so an OEM/security exception cannot crash Compose.
+    val isDefault = runCatching {
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            inputMethodManager.currentInputMethodInfo?.id.equals(componentId, ignoreCase = true)
+        } else {
+            Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+                .equals(componentId, ignoreCase = true)
+        }
+    }.getOrDefault(false)
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Keyboard setup", style = MaterialTheme.typography.titleMedium)
