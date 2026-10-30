@@ -134,7 +134,6 @@ else
     pass "No matching NovaKeys fatal crash found in captured logcat"
   fi
   adb shell ime set "$ORIGINAL_IME" >/dev/null 2>&1 || warn "Could not restore the previously selected keyboard automatically"
-  ORIGINAL_IME=""
 fi
 
 section "5. Summary"
