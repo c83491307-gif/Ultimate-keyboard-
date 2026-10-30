@@ -80,7 +80,7 @@ fi
 echo "Checking app process and Android runtime crash log..."
 adb shell pidof "$PACKAGE" >/dev/null || fail "NovaKeys process died during IME activation"
 adb logcat -d -v threadtime > "$RESULTS_DIR/logcat.txt"
-if grep -Eq 'FATAL EXCEPTION|Fatal signal [0-9]+|Process .*com\.creazzy\\.novakeys\\.debug.* has died' "$RESULTS_DIR/logcat.txt"; then
+if grep -Eq 'FATAL EXCEPTION|Fatal signal [0-9]+|Process .*com\.creazzy\.novakeys\.debug.* has died' "$RESULTS_DIR/logcat.txt"; then
   fail "Android runtime crash detected; see uploaded emulator-test-results artifact"
 fi
 
