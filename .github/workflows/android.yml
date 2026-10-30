@@ -25,8 +25,6 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.13"
       - name: Build debug APK, run unit tests, and lint
         run: gradle assembleDebug assembleRelease testDebugUnitTest lintDebug
       - name: Verify debug APK and prepare alternate download
@@ -62,7 +60,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-
   emulator_smoke:
     name: Install app and smoke-test IME on Android emulator
     needs: build
@@ -81,8 +78,9 @@ jobs:
           api-level: 35
           target: default
           arch: x86_64
-          profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -camera-back none
+          profile: pixel_6
+          cores: 4
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -camera-back none -memory 4096
           emulator-boot-timeout: 1200
           disable-animations: true
           script: bash .github/scripts/android-emulator-smoke.sh emulator-input/app-debug.apk
@@ -142,8 +140,6 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.13"
       - name: Validate release signing secrets
         shell: bash
         env:
