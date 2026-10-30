@@ -34,7 +34,7 @@ adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1
 
 APP_PID=""
 for attempt in $(seq 1 60); do
-  APP_PID="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\\r' || true)"
+  APP_PID="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true)"
   if [[ -n "$APP_PID" ]]; then break; fi
   sleep 1
 done
@@ -43,7 +43,7 @@ done
 echo "Enabling NovaKeys as the active emulator input method..."
 adb shell ime enable "$IME_COMPONENT"
 adb shell ime set "$IME_COMPONENT"
-DEFAULT_IME="$(adb shell settings get secure default_input_method | tr -d '\\r')"
+DEFAULT_IME="$(adb shell settings get secure default_input_method | tr -d '\r')"
 [[ "$DEFAULT_IME" == "$IME_COMPONENT" ]] || fail "Expected default IME $IME_COMPONENT, got: $DEFAULT_IME"
 
 echo "Opening a real focused text editor and explicitly requesting the keyboard..."
@@ -80,7 +80,7 @@ fi
 echo "Checking app process and Android runtime crash log..."
 adb shell pidof "$PACKAGE" >/dev/null || fail "NovaKeys process died during IME activation"
 adb logcat -d -v threadtime > "$RESULTS_DIR/logcat.txt"
-if grep -Eq 'FATAL EXCEPTION|Fatal signal [0-9]+|Process .*com\\.creazzy\\.novakeys\\.debug.* has died' "$RESULTS_DIR/logcat.txt"; then
+if grep -Eq 'FATAL EXCEPTION|Fatal signal [0-9]+|Process .*com\.creazzy\\.novakeys\\.debug.* has died' "$RESULTS_DIR/logcat.txt"; then
   fail "Android runtime crash detected; see uploaded emulator-test-results artifact"
 fi
 
