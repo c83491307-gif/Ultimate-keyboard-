@@ -89,7 +89,7 @@ class ImeSmokeTestActivity : Activity() {
             isFocusable = true
             isFocusableInTouchMode = true
             showSoftInputOnFocus = true
-            singleLine = true
+            setSingleLine(true)
         }
         editor = input
         container.addView(input, LinearLayout.LayoutParams(
