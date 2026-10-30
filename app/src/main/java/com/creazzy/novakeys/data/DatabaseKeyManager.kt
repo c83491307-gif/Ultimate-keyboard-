@@ -3,7 +3,6 @@ package com.creazzy.novakeys.data
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.util.Base64 as JvmBase64
@@ -24,7 +23,7 @@ class DatabaseKeyManager(private val context: Context) {
     private val alias = "novakeys_db_wrap_v1"
     private val prefs = context.getSharedPreferences("db_key_wrap", Context.MODE_PRIVATE)
 
-    class KeyRecoveryException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    open class KeyRecoveryException(message: String, cause: Throwable? = null) : Exception(message, cause)
     class KeyLostException(cause: Throwable? = null) :
         KeyRecoveryException("The database wrapping key is missing. Restore the encrypted vault backup.", cause)
     class KeyCorruptedException(cause: Throwable? = null) :
