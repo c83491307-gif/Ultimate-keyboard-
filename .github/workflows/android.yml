@@ -195,6 +195,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Install Android 16 QPR2 compile SDK (API 36.1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          "$SDKMANAGER" "platforms;android-36.1"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
