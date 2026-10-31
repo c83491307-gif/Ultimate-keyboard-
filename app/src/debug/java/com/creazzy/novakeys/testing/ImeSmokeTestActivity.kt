@@ -44,7 +44,9 @@ class ImeSmokeTestActivity : Activity() {
             } else {
                 false
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {\n                window.insetsController?.show(WindowInsets.Type.ime())\n            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.show(WindowInsets.Type.ime())
+            }
             requestAttempts++
             status?.text = "windowFocus=${hasWindowFocus()} editorFocus=${target.hasFocus()} " +
                 "showAccepted=$accepted attempts=$requestAttempts"
