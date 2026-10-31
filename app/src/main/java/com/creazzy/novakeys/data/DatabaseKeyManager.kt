@@ -5,7 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import java.security.SecureRandom
-import java.util.Base64 as JvmBase64
+import android.util.Base64
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -100,7 +100,7 @@ class DatabaseKeyManager(private val context: Context) {
 
         internal fun decodeAndUnwrap(encoded: String, key: SecretKey): ByteArray {
             val all = try {
-                JvmBase64.getDecoder().decode(encoded)
+                Base64.decode(encoded, Base64.NO_WRAP)
             } catch (e: IllegalArgumentException) {
                 throw KeyCorruptedException(e)
             }
@@ -121,7 +121,7 @@ class DatabaseKeyManager(private val context: Context) {
             require(raw.size == PASSPHRASE_BYTES)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, key)
-            return JvmBase64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(raw))
+            return Base64.encodeToString(cipher.iv + cipher.doFinal(raw), Base64.NO_WRAP)
         }
     }
 }
