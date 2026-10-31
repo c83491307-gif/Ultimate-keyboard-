@@ -2,6 +2,7 @@ package com.creazzy.novakeys.testing
 
 import android.app.Activity
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -43,7 +44,7 @@ class ImeSmokeTestActivity : Activity() {
             } else {
                 false
             }
-            window.insetsController?.show(WindowInsets.Type.ime())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {\n                window.insetsController?.show(WindowInsets.Type.ime())\n            }
             requestAttempts++
             status?.text = "windowFocus=${hasWindowFocus()} editorFocus=${target.hasFocus()} " +
                 "showAccepted=$accepted attempts=$requestAttempts"
