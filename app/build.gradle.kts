@@ -44,9 +44,15 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             isShrinkResources = false
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
+            // Keep CI/offline sideload builds installable without asking the user
+            // to provide a private production keystore. Public tagged releases still
+            // require the dedicated release secrets in the publishing workflow.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
+            if (!hasReleaseSigning) versionNameSuffix = "-offline-test"
         }
     }
 
