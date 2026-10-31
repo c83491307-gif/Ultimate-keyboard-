@@ -61,8 +61,24 @@ for attempt in $(seq 1 45); do
 done
 [[ "$HOST_VISIBLE" == true ]] || fail "IME smoke host activity did not become visible"
 
-# The debug host requests the keyboard only after its real editor owns focus.
-# Avoid coordinate taps: fixed screen coordinates are density/layout dependent.
+# Android emulators can report the host Activity as resumed while another window
+# still owns input focus (for example, the Settings screen used during IME setup).
+# Derive a tap point from the live emulator resolution, near the top editor field,
+# instead of relying on a device-specific hard-coded coordinate.
+SCREEN_SIZE="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1)"
+SCREEN_WIDTH="${SCREEN_SIZE%x*}"
+SCREEN_HEIGHT="${SCREEN_SIZE#*x}"
+if [[ "$SCREEN_WIDTH" =~ ^[0-9]+$ && "$SCREEN_HEIGHT" =~ ^[0-9]+$ ]]; then
+  TAP_X=$((SCREEN_WIDTH / 2))
+  TAP_Y=$((SCREEN_HEIGHT / 6))
+  echo "Tapping editor using detected emulator size ${SCREEN_SIZE} at ${TAP_X},${TAP_Y}..."
+  adb shell input tap "$TAP_X" "$TAP_Y"
+else
+  fail "Could not determine emulator screen size: $SCREEN_SIZE"
+fi
+sleep 2
+
+# The debug host also requests the keyboard after its editor owns focus.
 IME_VISIBLE=false
 for attempt in $(seq 1 60); do
   adb shell dumpsys input_method > "$RESULTS_DIR/input-method.txt" 2>&1 || true
