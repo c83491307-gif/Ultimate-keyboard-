@@ -34,7 +34,11 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
+          # sdkmanager closes stdin after accepting licenses; avoid pipefail
+          # treating the resulting SIGPIPE from yes as a failed setup step.
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           "$SDKMANAGER" "platforms;android-36.1"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
