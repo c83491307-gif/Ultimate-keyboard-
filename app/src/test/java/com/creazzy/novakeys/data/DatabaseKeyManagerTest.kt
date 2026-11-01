@@ -4,7 +4,10 @@ import java.util.Base64
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class DatabaseKeyManagerTest {
     private val key = SecretKeySpec(ByteArray(32) { (it + 1).toByte() }, "AES")
     private val passphrase = ByteArray(32) { (it * 3).toByte() }
