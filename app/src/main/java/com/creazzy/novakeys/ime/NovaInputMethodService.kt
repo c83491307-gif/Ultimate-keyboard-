@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.provider.MediaStore
 import android.text.InputType
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -30,6 +31,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.inputmethodservice.InputMethodService
+import com.creazzy.novakeys.ime.domain.EditorContext
+import com.creazzy.novakeys.ime.domain.EditorEffect
+import com.creazzy.novakeys.ime.domain.KeyboardAction
+import com.creazzy.novakeys.ime.domain.KeyboardController
+import com.creazzy.novakeys.ime.domain.KeyboardFeature
+import com.creazzy.novakeys.ime.domain.KeyboardLanguage
+import com.creazzy.novakeys.ime.domain.KeyboardMode
 import com.creazzy.novakeys.clipboard.ClipboardImage
 import com.creazzy.novakeys.clipboard.ScreenshotClipboardActivity
 import com.creazzy.novakeys.clipboard.ScreenshotClipboardStore
@@ -45,9 +53,22 @@ import androidx.core.view.inputmethod.InputContentInfoCompat
  * for editors that reject images, the image URI is placed on the system clipboard.
  */
 class NovaInputMethodService : InputMethodService() {
-    private var language = "en"
-    private var numeric = false
-    private var shifted = false
+    private val keyboardController by lazy {
+        KeyboardController { effect ->
+            when (effect) {
+                is EditorEffect.CommitText -> currentInputConnection?.commitText(effect.text, 1)
+                EditorEffect.DeleteBackward -> currentInputConnection?.let { connection ->
+                    if (!connection.deleteSurroundingText(1, 0)) {
+                        connection.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL))
+                    }
+                }
+            }
+        }
+    }
+    private val keyboardState get() = keyboardController.state
+    private val language get() = if (keyboardState.language == KeyboardLanguage.ENGLISH) "en" else "ar"
+    private val numeric get() = keyboardState.mode == KeyboardMode.NUMBERS
+    private val shifted get() = keyboardState.shifted
     private var drawingMode = false
     private var typographyMode = false
     private var drawingCanvas: DrawingCanvasView? = null
@@ -68,22 +89,60 @@ class NovaInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        screenshotThread = HandlerThread("NovaKeysScreenshotObserver").apply { start() }
-        screenshotHandler = Handler(screenshotThread!!.looper)
-        screenshotObserver = object : ContentObserver(screenshotHandler) {
+
+        // Screenshot sync is optional: a worker or MediaStore failure must never
+        // prevent Android from creating the input method.
+        val worker = HandlerThread("NovaKeysScreenshotObserver")
+        val threadStarted = runCatching { worker.start() }
+        if (threadStarted.isFailure) {
+            Log.w(
+                "NovaKeysIme",
+                "Screenshot observer thread could not start; auto-sync is disabled",
+                threadStarted.exceptionOrNull()
+            )
+            return
+        }
+
+        val handler = runCatching { Handler(worker.looper) }.getOrElse { error ->
+            runCatching { worker.quitSafely() }
+            Log.w("NovaKeysIme", "Screenshot observer handler could not be created", error)
+            return
+        }
+
+        val observer = object : ContentObserver(handler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
-                screenshotHandler?.removeCallbacks(pendingScreenshotScan)
-                screenshotHandler?.postDelayed(pendingScreenshotScan, 1100L)
+                handler.removeCallbacks(pendingScreenshotScan)
+                handler.postDelayed(pendingScreenshotScan, 1100L)
             }
         }
-        runCatching {
+
+        screenshotThread = worker
+        screenshotHandler = handler
+        screenshotObserver = observer
+
+        val registered = runCatching {
             contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, screenshotObserver!!
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer
             )
+            true
+        }.getOrElse { error ->
+            Log.w("NovaKeysIme", "Screenshot observer registration failed; auto-sync is disabled", error)
+            false
         }
+
+        if (!registered) {
+            runCatching { contentResolver.unregisterContentObserver(observer) }
+            handler.removeCallbacks(pendingScreenshotScan)
+            runCatching { worker.quitSafely() }
+            screenshotObserver = null
+            screenshotHandler = null
+            screenshotThread = null
+            return
+        }
+
         // Resume any opt-in sync that was enabled before the keyboard service started.
-        screenshotHandler?.postDelayed(pendingScreenshotScan, 500L)
+        handler.postDelayed(pendingScreenshotScan, 500L)
     }
 
     override fun onDestroy() {
@@ -100,8 +159,14 @@ class NovaInputMethodService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        numeric = false
-        shifted = attribute?.inputType?.and(0x0000000f) == 2
+        val inputType = attribute?.inputType ?: InputType.TYPE_CLASS_TEXT
+        val inputClass = inputType and InputType.TYPE_MASK_CLASS
+        val isSensitive = isSensitiveInput(inputType)
+        val isMultiline = inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
+        keyboardController.resetForEditor(
+            EditorContext(isSensitive = isSensitive, isMultiline = isMultiline),
+            if (inputClass == InputType.TYPE_CLASS_NUMBER) KeyboardMode.NUMBERS else KeyboardMode.LETTERS
+        )
         if (root != null) rebuild()
     }
 
@@ -111,13 +176,14 @@ class NovaInputMethodService : InputMethodService() {
     }
 
     private fun buildKeyboard(): View {
-        root = LinearLayout(this).apply {
+        val keyboardRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(6), dp(5), dp(8))
             setBackgroundColor(Color.rgb(235, 239, 245))
         }
+        root = keyboardRoot
         rebuild()
-        return root!!
+        return keyboardRoot
     }
 
     private fun rebuild() {
@@ -135,7 +201,7 @@ class NovaInputMethodService : InputMethodService() {
         }
         toolbar.addView(label("NovaKeys", 14f, true), LinearLayout.LayoutParams(0, dp(38), 1f))
         toolbar.addView(toolButton(if (language == "en") "EN · عربي" else "عربي · EN") {
-            language = if (language == "en") "ar" else "en"; rebuild()
+            keyboardController.dispatch(KeyboardAction.SwitchLanguage); rebuild()
         }, LinearLayout.LayoutParams(0, dp(38), 1.25f))
         if (!sensitiveField) {
             toolbar.addView(toolButton("Aa") { drawingMode = false; typographyMode = !typographyMode; rebuild() }, LinearLayout.LayoutParams(dp(42), dp(38)))
@@ -144,7 +210,7 @@ class NovaInputMethodService : InputMethodService() {
             toolbar.addView(toolButton("✎ Draw") { drawingMode = !drawingMode; rebuild() }, LinearLayout.LayoutParams(dp(58), dp(38)))
         }
         toolbar.addView(toolButton(if (numeric) "ABC" else "123") {
-            numeric = !numeric; rebuild()
+            keyboardController.dispatch(KeyboardAction.ToggleNumberMode); rebuild()
         }, LinearLayout.LayoutParams(dp(48), dp(38)))
         toolbar.addView(toolButton("⌄") { requestHideSelf(0) }, LinearLayout.LayoutParams(dp(34), dp(38)))
         panel.addView(toolbar)
@@ -187,7 +253,7 @@ class NovaInputMethodService : InputMethodService() {
             panel.addView(line)
         }
         val bottom = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        bottom.addView(keyButton("?123") { numeric = !numeric; rebuild() }, LinearLayout.LayoutParams(dp(60), dp(44)).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
+        bottom.addView(keyButton("?123") { keyboardController.dispatch(KeyboardAction.ToggleNumberMode); rebuild() }, LinearLayout.LayoutParams(dp(60), dp(44)).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         bottom.addView(keyButton(if (language == "ar") "،" else ",") { commit(if (language == "ar") "،" else ",") }, LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         bottom.addView(keyButton("Space") { commit(" ") }, LinearLayout.LayoutParams(0, dp(44), 3f).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
         bottom.addView(keyButton(if (isLastField()) "✓" else "↵") { handleEnter() }, LinearLayout.LayoutParams(dp(54), dp(44)).apply { setMargins(dp(2), dp(3), dp(2), dp(3)) })
@@ -370,8 +436,9 @@ class NovaInputMethodService : InputMethodService() {
         panel.addView(scroll, LinearLayout.LayoutParams(-1, dp(50)))
     }
 
-    private fun isSensitiveInput(): Boolean {
-        val type = currentInputEditorInfo?.inputType ?: return false
+    private fun isSensitiveInput(): Boolean = keyboardState.editor.isSensitive
+
+    private fun isSensitiveInput(type: Int): Boolean {
         val inputClass = type and InputType.TYPE_MASK_CLASS
         val variation = type and InputType.TYPE_MASK_VARIATION
         return when (inputClass) {
@@ -432,11 +499,12 @@ class NovaInputMethodService : InputMethodService() {
 
     private fun handleKey(key: String) {
         when (key) {
-            "⇧" -> { shifted = !shifted; rebuild() }
-            "⌫" -> currentInputConnection?.let { connection ->
-                if (!connection.deleteSurroundingText(1, 0)) connection.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL))
+            "⇧" -> { keyboardController.dispatch(KeyboardAction.ToggleShift); rebuild() }
+            "⌫" -> keyboardController.dispatch(KeyboardAction.DeleteBackward)
+            else -> {
+                commit(if (shifted && key.length == 1) key.uppercase() else key)
+                if (shifted) { keyboardController.dispatch(KeyboardAction.ToggleShift); rebuild() }
             }
-            else -> commit(if (shifted && key.length == 1) key.uppercase() else key).also { if (shifted) { shifted = false; rebuild() } }
         }
     }
 
@@ -452,7 +520,7 @@ class NovaInputMethodService : InputMethodService() {
             action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_SEND
     }
 
-    private fun commit(value: String) { currentInputConnection?.commitText(value, 1) }
+    private fun commit(value: String) { keyboardController.dispatch(KeyboardAction.TypeText(value)) }
 
     private fun displayKey(key: String): String =
         if (shifted && key.length == 1 && key[0].isLetter()) key.uppercase() else key

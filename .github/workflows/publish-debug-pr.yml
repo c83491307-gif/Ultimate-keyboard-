@@ -1,0 +1,64 @@
+name: Publish NovaKeys APK
+
+on:
+  pull_request:
+    types: [synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-debug-apk:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.ref == 'rewrite/nova-v2-foundation' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android SDK platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          "$SDKMANAGER" "platforms;android-36.1"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Build and verify offline APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle assembleDebug testDebugUnitTest lintDebug
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+          mkdir -p release-assets
+          cp "$APK" release-assets/NovaKeys-v2-debug.apk
+          (cd release-assets && sha256sum NovaKeys-v2-debug.apk > SHA256SUMS.txt)
+      - name: Publish public APK download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: novakeys-v2-debug
+          name: NovaKeys V2 — Debug install build
+          body: |
+            Public sideload test build of NovaKeys V2.
+            Android 8.0+ (minSdk 26). Offline build.
+            This is a DEBUG-signed test APK, not a production-signed release.
+            Emulator and physical-device validation must be completed before production use.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: |
+            release-assets/NovaKeys-v2-debug.apk
+            release-assets/SHA256SUMS.txt
+          fail_on_unmatched_files: true

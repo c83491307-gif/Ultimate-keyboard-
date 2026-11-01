@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AutofillService was introduced in Android 8.0 (API 26). -->
+    <bool name="autofill_service_supported">false</bool>
+</resources>
