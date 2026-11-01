@@ -46,4 +46,30 @@ class KeyboardCoreTest {
         val transition = KeyboardReducer.reduce(KeyboardState(), KeyboardAction.DeleteBackward)
         assertEquals(listOf(EditorEffect.DeleteBackward), transition.effects)
     }
+    @Test fun controllerExecutesEffectsAndOwnsUpdatedState() {
+        val executed = mutableListOf<EditorEffect>()
+        val controller = KeyboardController(effectHandler = executed::add)
+
+        controller.dispatch(KeyboardAction.TypeText("Hi"))
+        controller.dispatch(KeyboardAction.ToggleShift)
+
+        assertEquals(listOf(EditorEffect.CommitText("Hi")), executed)
+        assertTrue(controller.state.shifted)
+    }
+
+    @Test fun editorResetAppliesNumericModeAndSensitivePolicy() {
+        val controller = KeyboardController(effectHandler = {})
+        controller.dispatch(KeyboardAction.OpenFeature(KeyboardFeature.CLIPBOARD))
+
+        val state = controller.resetForEditor(
+            EditorContext(isSensitive = true, isMultiline = false),
+            KeyboardMode.NUMBERS
+        )
+
+        assertEquals(KeyboardMode.NUMBERS, state.mode)
+        assertEquals(KeyboardFeature.NONE, state.feature)
+        assertTrue(state.editor.isSensitive)
+        assertTrue(!state.shifted)
+    }
+
 }
