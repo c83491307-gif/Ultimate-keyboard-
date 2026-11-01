@@ -14,11 +14,15 @@ val hasReleaseSigning = listOf(releaseStorePath, releaseStorePassword, releaseKe
 
 android {
     namespace = "com.creazzy.novakeys"
-    compileSdk = 36
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "com.creazzy.novakeys"
-        minSdk = 31
+        minSdk = 24
         targetSdk = 36
         versionCode = providers.environmentVariable("APP_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = providers.environmentVariable("APP_VERSION_NAME").orNull ?: "1.0.0"
@@ -44,8 +48,33 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             isShrinkResources = false
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
+            // Keep CI/offline sideload builds installable without asking the user
+            // to provide a private production keystore. Public tagged releases still
+            // require the dedicated release secrets in the publishing workflow.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            if (!hasReleaseSigning) versionNameSuffix = "-offline-test"
+        }
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all {
+                it.jvmArgs(
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens=java.base/java.util=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.net=ALL-UNNAMED",
+                    "--add-opens=java.base/java.security=ALL-UNNAMED",
+                    "--add-opens=java.base/java.text=ALL-UNNAMED",
+                    "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                    "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
+                    "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
+                )
             }
         }
     }
@@ -78,4 +107,5 @@ dependencies {
     implementation("androidx.sqlite:sqlite-ktx:2.7.1")
     implementation("androidx.biometric:biometric:1.1.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

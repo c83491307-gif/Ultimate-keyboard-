@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.provider.MediaStore
 import android.text.InputType
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -68,22 +69,60 @@ class NovaInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        screenshotThread = HandlerThread("NovaKeysScreenshotObserver").apply { start() }
-        screenshotHandler = Handler(screenshotThread!!.looper)
-        screenshotObserver = object : ContentObserver(screenshotHandler) {
+
+        // Screenshot sync is optional: a worker or MediaStore failure must never
+        // prevent Android from creating the input method.
+        val worker = HandlerThread("NovaKeysScreenshotObserver")
+        val threadStarted = runCatching { worker.start() }
+        if (threadStarted.isFailure) {
+            Log.w(
+                "NovaKeysIme",
+                "Screenshot observer thread could not start; auto-sync is disabled",
+                threadStarted.exceptionOrNull()
+            )
+            return
+        }
+
+        val handler = runCatching { Handler(worker.looper) }.getOrElse { error ->
+            runCatching { worker.quitSafely() }
+            Log.w("NovaKeysIme", "Screenshot observer handler could not be created", error)
+            return
+        }
+
+        val observer = object : ContentObserver(handler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
-                screenshotHandler?.removeCallbacks(pendingScreenshotScan)
-                screenshotHandler?.postDelayed(pendingScreenshotScan, 1100L)
+                handler.removeCallbacks(pendingScreenshotScan)
+                handler.postDelayed(pendingScreenshotScan, 1100L)
             }
         }
-        runCatching {
+
+        screenshotThread = worker
+        screenshotHandler = handler
+        screenshotObserver = observer
+
+        val registered = runCatching {
             contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, screenshotObserver!!
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer
             )
+            true
+        }.getOrElse { error ->
+            Log.w("NovaKeysIme", "Screenshot observer registration failed; auto-sync is disabled", error)
+            false
         }
+
+        if (!registered) {
+            runCatching { contentResolver.unregisterContentObserver(observer) }
+            handler.removeCallbacks(pendingScreenshotScan)
+            runCatching { worker.quitSafely() }
+            screenshotObserver = null
+            screenshotHandler = null
+            screenshotThread = null
+            return
+        }
+
         // Resume any opt-in sync that was enabled before the keyboard service started.
-        screenshotHandler?.postDelayed(pendingScreenshotScan, 500L)
+        handler.postDelayed(pendingScreenshotScan, 500L)
     }
 
     override fun onDestroy() {
@@ -111,13 +150,14 @@ class NovaInputMethodService : InputMethodService() {
     }
 
     private fun buildKeyboard(): View {
-        root = LinearLayout(this).apply {
+        val keyboardRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(6), dp(5), dp(8))
             setBackgroundColor(Color.rgb(235, 239, 245))
         }
+        root = keyboardRoot
         rebuild()
-        return root!!
+        return keyboardRoot
     }
 
     private fun rebuild() {
