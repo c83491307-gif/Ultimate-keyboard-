@@ -1,4 +1,5 @@
 name: Publish NovaKeys APK
+# This branch commit re-triggers the guarded PR release workflow.
 
 on:
   pull_request:
