@@ -14,10 +14,6 @@ concurrency:
 permissions:
   contents: read
 
-concurrency:
-  group: novakeys-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
   build:
     name: Build, test, lint, and verify
