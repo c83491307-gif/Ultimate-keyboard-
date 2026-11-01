@@ -1,14 +1,17 @@
 name: Android build and release
 
 on:
+  # Feature branches are validated by pull_request only. This prevents a
+  # push + pull_request pair from building the same commit twice.
   push:
-    branches: [main, fix/phase-4-ime-smoke-focus]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: novakeys-${{ github.ref }}
+  # Use the PR source branch so all events for the same branch share a group.
+  group: novakeys-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
