@@ -2,7 +2,7 @@
 
 ## Goal
 
-Rebuild NovaKeys around a reliable Android Input Method Engine (IME), with Android 7.0 / API 24 as the minimum supported version. Reliability, offline operation, privacy, and testability take priority over preserving legacy implementation details.
+Rebuild NovaKeys around a reliable Android Input Method Engine (IME), with Android 8.0 / API 26 as the minimum supported version. Reliability, offline operation, privacy, and testability take priority over preserving legacy implementation details.
 
 This document is the implementation contract for the rewrite branch. It does not claim that planned features are already implemented.
 
@@ -20,11 +20,11 @@ This document is the implementation contract for the rewrite branch. It does not
 - **UI:** renders state and forwards user actions. It does not perform database or framework work directly.
 - **Feature modules/packages:** clipboard, emoji, snippets, drawing, typography, themes, and vault each own their own state and repository contracts.
 
-### 3. Android 7 compatibility is a design constraint
+### 3. Android 8.0 (API 26) is the supported baseline
 
-- Keep `minSdk = 24`.
-- Guard APIs introduced after API 24 at the platform boundary.
-- Do not copy FlorisBoard's current application configuration wholesale: its current minSdk is higher than NovaKeys' required minimum.
+- Keep `minSdk = 26`.
+- Guard APIs introduced after API 26 at the platform boundary.
+- Do not copy FlorisBoard's current application configuration wholesale: its current minSdk can be used as a reference point, but NovaKeys must still validate every dependency against API 26.
 - Keep modern Android integrations optional and degrade safely when unavailable.
 
 ### 4. Prefer a native View-based IME surface for V2
@@ -34,7 +34,7 @@ Two viable approaches were considered:
 1. Compose-first IME surface, similar in spirit to FlorisBoard's Compose root and controller composition locals.
 2. Native View-based IME surface with framework lifecycle adapter and explicit controllers.
 
-Choose option 2 for the first stable V2 foundation. It reduces framework/lifecycle uncertainty in the most sensitive Android component, keeps the API-24 path straightforward, and allows the existing Compose-based app/settings screens to remain independent. Compose may still be used in the host application where it is already useful.
+Choose option 2 for the first stable V2 foundation. It reduces framework/lifecycle uncertainty in the most sensitive Android component, keeps the API-26 path straightforward, and allows the existing Compose-based app/settings screens to remain independent. Compose may still be used in the host application where it is already useful.
 
 ### 5. Offline-first and privacy boundaries
 
@@ -143,9 +143,9 @@ The controller owns state transitions and delegates text operations to an inject
 ## Test strategy
 
 1. **Pure unit tests:** state transitions, layouts, action validation, sensitive-field policy.
-2. **Robolectric:** API-24 and API-35 adapter behavior, service startup, editor mapping, lifecycle cleanup.
+2. **Robolectric:** API-26 and API-35 adapter behavior, service startup, editor mapping, lifecycle cleanup.
 3. **Instrumented smoke test:** install, enable, select, bind, show, type, delete, switch language, hide.
-4. **Compatibility matrix:** API 24 baseline plus a modern API level. Emulator boot failures must be reported separately from application failures.
+4. **Compatibility matrix:** API 26 baseline (Android 8.0) plus a modern API level. Emulator boot failures must be reported separately from application failures.
 5. **Feature regression tests:** clipboard retention, encrypted vault recovery, backup import/export, and optional feature isolation.
 
 ## Migration and deletion policy
