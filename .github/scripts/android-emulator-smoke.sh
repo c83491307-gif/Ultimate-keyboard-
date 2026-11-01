@@ -17,14 +17,50 @@ capture_diagnostics() {
 }
 
 fail() {
+  local exit_code="${2:-1}"
   echo "::error::$1"
   capture_diagnostics
-  exit 1
+  exit "$exit_code"
 }
 
 test -s "$APK_PATH" || fail "Debug APK not found: $APK_PATH"
 adb wait-for-device
-adb shell getprop sys.boot_completed | grep -q "1" || fail "Android emulator did not finish booting"
+
+# ADB connectivity can precede full Android boot. Allow the workflow's
+# configured 20-minute emulator boot window and report the measured duration.
+BOOT_TIMEOUT=1200
+BOOT_START=$SECONDS
+while :; do
+  BOOT_STATE="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  if [[ "$BOOT_STATE" == "1" ]]; then
+    break
+  fi
+  BOOT_ELAPSED=$((SECONDS - BOOT_START))
+  if (( BOOT_ELAPSED >= BOOT_TIMEOUT )); then
+    echo "Emulator boot did not complete after ${BOOT_ELAPSED}s (limit: ${BOOT_TIMEOUT}s)."
+    fail "Android emulator boot completion timed out" 2
+  fi
+  sleep 2
+done
+BOOT_ELAPSED=$((SECONDS - BOOT_START))
+echo "Emulator boot completed in ${BOOT_ELAPSED}s."
+
+# Confirm PackageManager is responsive before attempting APK installation.
+PM_READY=false
+for attempt in $(seq 1 12); do
+  if adb shell pm list packages >/dev/null 2>&1; then
+    PM_READY=true
+    echo "Package Manager ready on attempt ${attempt}/12."
+    break
+  fi
+  echo "Package Manager not ready; retry ${attempt}/12."
+  sleep 5
+done
+if [[ "$PM_READY" != true ]]; then
+  echo "Package Manager did not become responsive after 12 attempts."
+  fail "Android Package Manager readiness timed out" 3
+fi
+
 adb logcat -c
 
 echo "Installing NovaKeys debug APK..."
