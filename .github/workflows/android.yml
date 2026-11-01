@@ -57,8 +57,10 @@ jobs:
           unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
           unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?[.]dex$'
           unzip -Z1 "$APK" | grep -qx 'resources.arsc'
-          aapt dump badging "$APK" | grep -q "sdkVersion:'24'"
-          if aapt dump permissions "$APK" | grep -q 'android.permission.INTERNET'; then
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$AAPT" || { echo "::error::Android build-tools aapt executable was not found"; exit 1; }
+          "$AAPT" dump badging "$APK" | grep -q "sdkVersion:'24'"
+          if "$AAPT" dump permissions "$APK" | grep -q 'android.permission.INTERNET'; then
             echo "::error::NovaKeys must remain usable offline and must not request INTERNET permission."
             exit 1
           fi
