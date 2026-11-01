@@ -59,7 +59,7 @@ jobs:
           unzip -Z1 "$APK" | grep -qx 'resources.arsc'
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$AAPT" || { echo "::error::Android build-tools aapt executable was not found"; exit 1; }
-          "$AAPT" dump badging "$APK" | grep -q "sdkVersion:'24'"
+          "$AAPT" dump badging "$APK" | grep -q "sdkVersion:'26'"
           if "$AAPT" dump permissions "$APK" | grep -q 'android.permission.INTERNET'; then
             echo "::error::NovaKeys must remain usable offline and must not request INTERNET permission."
             exit 1
@@ -122,38 +122,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: novakeys-emulator-test-results
-          path: emulator-test-results/
-          if-no-files-found: ignore
-          retention-days: 30
-
-  emulator_android7_smoke:
-    name: Verify Android 7.0 (API 24) compatibility
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - name: Download the exact APK produced by the build job
-        uses: actions/download-artifact@v4
-        with:
-          name: novakeys-debug-downloads
-          path: emulator-input
-      - name: Boot Android 7.0 emulator and test NovaKeys
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 24
-          target: default
-          arch: x86_64
-          cores: 4
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -memory 4096
-          emulator-boot-timeout: 1200
-          disable-animations: true
-          script: bash .github/scripts/android-emulator-smoke.sh emulator-input/app-debug.apk
-      - name: Upload Android 7 diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: novakeys-android7-test-results
           path: emulator-test-results/
           if-no-files-found: ignore
           retention-days: 30
